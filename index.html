@@ -14,6 +14,44 @@
   body{margin:0;background:var(--bg);color:var(--ink);font-family:'Trebuchet MS',system-ui,sans-serif;
     overflow-x:hidden;user-select:none;image-rendering:pixelated;}
   #app{max-width:560px;margin:0 auto;min-height:100vh;position:relative;padding:10px;}
+
+  /* ============ DESKTOP LAYOUT (≥900px): vse na eno stran, večje, brez scrolla ============ */
+  @media (min-width:900px){
+    #app{max-width:1320px;padding:18px 26px;min-height:100vh;height:100vh;display:flex;flex-direction:column;justify-content:center;}
+    .screen{height:100%;display:flex;flex-direction:column;}
+    /* ne-bojni zasloni (title/intro/reward/konec) centrirani */
+    .screen:not(.battle):not(.oppturn){justify-content:center;}
+    /* BOJ: dvostolpčni grid — levo oder (arena/score/momentum), desno roka+log */
+    .screen.battle{display:grid;grid-template-columns:1.15fr 1fr;grid-template-rows:1fr;gap:26px;align-items:center;height:100%;}
+    .screen.battle .bf-left{display:flex;flex-direction:column;justify-content:center;gap:14px;min-width:0;height:100%;}
+    .screen.battle .bf-right{display:flex;flex-direction:column;justify-content:center;gap:14px;min-width:0;height:100%;}
+    /* arena večja, zapolni levi stolpec */
+    .screen.battle .arena{height:min(52vh,460px)!important;}
+    .screen.oppturn .arena{height:min(48vh,420px)!important;}
+    /* večji borci, koš, žoga + razmik za večjo areno */
+    #app .arena .fighter{width:clamp(120px,11vw,180px);height:clamp(120px,11vw,180px);bottom:14px;}
+    #app .arena .fighter.you{left:5%;} #app .arena .fighter.opp{right:5%;}
+    #app .arena .hoop{top:13%;width:80px;height:14px;}
+    #app .arena .net{top:13px;height:34px;}
+    /* roka: karte večje in v eni vrsti */
+    .screen.battle .hand{gap:13px;min-height:0;align-content:center;}
+    .screen.battle .hand .card{width:clamp(120px,9.4vw,158px);height:clamp(180px,14vw,237px);}
+    .screen.battle .log{max-height:130px;font-size:13px;}
+    .screen.battle .mom-wrap{padding:12px 16px;}
+    .screen.battle .mom-track{height:24px;}
+    .screen.battle .mom-top{font-size:13px;}
+    .screen.battle .mom-top .mom-val{font-size:18px;}
+    /* obrambni zaslon (oppTurn) na desktopu prav tako dvostolpčno */
+    .screen.oppturn{display:grid;grid-template-columns:1.15fr 1fr;gap:26px;align-items:center;height:100%;}
+    .screen.oppturn .bf-left{display:flex;flex-direction:column;justify-content:center;gap:14px;}
+    .screen.oppturn .bf-right{display:flex;flex-direction:column;justify-content:center;gap:14px;}
+    .screen.oppturn .hand .card{width:clamp(110px,8.6vw,150px);height:clamp(165px,13vw,225px);}
+    /* nagradni zaslon: večje karte, vse na sredini */
+    .reward-cards .card{width:clamp(160px,13vw,210px);height:clamp(240px,19.5vw,315px);}
+    .big{font-size:38px;}
+    #s-title .logo{font-size:74px;} #s-title .logo2{font-size:44px;}
+  }
+
   .hidden{display:none!important;}
   img{image-rendering:pixelated;}
 
@@ -497,14 +535,18 @@ function renderBattle(){
       if(c.cashes||c.fixedP){const pp=Math.round(shotProb(c)*100);oddsBadge=`<div class="card-x" style="background:${pp>=65?'var(--green)':pp>=40?'var(--gold)':'var(--red)'};color:#1a1206">${pp}%</div>`;}
       return `<div class="card ${c.type} ${ok?'':'unplayable'}" data-idx="${idx}" ${rarAttr(id)} onclick="${ok?`playCard(${idx})`:''}">${cardInner(id,1)}${oddsBadge}</div>`;
     }).join('');
-  screen.innerHTML=`<div class="screen">
-    ${arenaHtml()}
-    ${scoreboardHtml()}
-    ${momHtml('you')}
-    <div class="poss-bar">Energija: <span class="energy">${ep}</span> · <span class="muted" style="font-size:11px">Gradi z 💨⚡🔥🎯 — unovči z 🏀🎯</span></div>
-    <div class="hand" id="hand">${handHtml}</div>
-    <div class="end-poss"><button class="btn" onclick="endPossession()">Končaj napad →</button></div>
-    <div class="log">${G.log.join('')||'<div class="muted">Boj se začne...</div>'}</div>
+  screen.innerHTML=`<div class="screen battle">
+    <div class="bf-left">
+      ${arenaHtml()}
+      ${scoreboardHtml()}
+      ${momHtml('you')}
+    </div>
+    <div class="bf-right">
+      <div class="poss-bar">Energija: <span class="energy">${ep}</span> · <span class="muted" style="font-size:11px">Gradi z 💨⚡🔥🎯 — unovči z 🏀🎯</span></div>
+      <div class="hand" id="hand">${handHtml}</div>
+      <div class="end-poss"><button class="btn" onclick="endPossession()">Končaj napad →</button></div>
+      <div class="log">${G.log.join('')||'<div class="muted">Boj se začne...</div>'}</div>
+    </div>
   </div>`;
 }
 
@@ -584,17 +626,21 @@ function playCard(idx){
 /* Timeout: izbira med +svoj / −njegov momentum */
 function promptTimeout(idx){
   const oppHas=G.oppMom>0;
-  screen.innerHTML=`<div class="screen">
-    ${arenaHtml()}
-    ${scoreboardHtml()}
-    ${momHtml('you')}
-    <div class="intent"><b>🧊 TIMEOUT</b><div style="font-size:12px;color:var(--muted);margin-top:6px">Izberi učinek:</div></div>
-    <div class="btn-row" style="margin-top:6px">
-      <button class="btn gold" onclick="resolveTimeout(${idx},'self')">📈 +25 svojega momentuma</button>
-      <button class="btn red" onclick="resolveTimeout(${idx},'opp')" ${oppHas?'':'disabled'}>📉 −30 njegovega ${oppHas?'':'(nima)'}</button>
+  screen.innerHTML=`<div class="screen oppturn">
+    <div class="bf-left">
+      ${arenaHtml()}
+      ${scoreboardHtml()}
+      ${momHtml('you')}
     </div>
-    <div class="center" style="margin-top:10px"><button class="btn" style="font-size:12px;padding:7px 12px" onclick="renderBattle()">↩ Prekliči</button></div>
-    <div class="log">${G.log.join('')||''}</div>
+    <div class="bf-right">
+      <div class="intent"><b>🧊 TIMEOUT</b><div style="font-size:12px;color:var(--muted);margin-top:6px">Izberi učinek:</div></div>
+      <div class="btn-row" style="margin-top:6px">
+        <button class="btn gold" onclick="resolveTimeout(${idx},'self')">📈 +25 svojega momentuma</button>
+        <button class="btn red" onclick="resolveTimeout(${idx},'opp')" ${oppHas?'':'disabled'}>📉 −30 njegovega ${oppHas?'':'(nima)'}</button>
+      </div>
+      <div class="center" style="margin-top:10px"><button class="btn" style="font-size:12px;padding:7px 12px" onclick="renderBattle()">↩ Prekliči</button></div>
+      <div class="log">${G.log.join('')||''}</div>
+    </div>
   </div>`;
 }
 function resolveTimeout(idx,mode){
@@ -693,18 +739,22 @@ function renderOppTurn(){
     return `<div class="card ${c.type} ${ok?'':'unplayable'}" ${rarAttr(x.id)} onclick="${ok?`chooseDefense(${x.idx})`:''}">${cardInner(x.id,1)}</div>`;
   }).join('') || '<div class="muted" style="padding:10px;font-size:13px">Ni obrambnih kart v roki — pritisni Pusti.</div>';
 
-  screen.innerHTML=`<div class="screen">
-    ${arenaHtml()}
-    ${scoreboardHtml()}
-    ${momHtml('opp')}
-    <div class="intent pulse"><b>${G.opp.nm}</b> ${intentTxt}<div style="font-size:11px;color:var(--muted);margin-top:4px">💡 ${tip}</div></div>
-    <div class="poss-bar">Tvoja obramba — energija: <span class="energy">${ep}</span></div>
-    <div class="center muted" style="font-size:12px;margin-bottom:4px">${chosenTxt}</div>
-    <div class="hand">${handHtml}</div>
-    <div class="end-poss btn-row" style="margin-top:10px">
-      <button class="btn red" onclick="resolveOppAttack()">${chosen.length?'🛡 Brani se!':'Pusti napad →'}</button>
+  screen.innerHTML=`<div class="screen oppturn">
+    <div class="bf-left">
+      ${arenaHtml()}
+      ${scoreboardHtml()}
+      ${momHtml('opp')}
     </div>
-    <div class="log">${G.log.join('')||''}</div>
+    <div class="bf-right">
+      <div class="intent pulse"><b>${G.opp.nm}</b> ${intentTxt}<div style="font-size:11px;color:var(--muted);margin-top:4px">💡 ${tip}</div></div>
+      <div class="poss-bar">Tvoja obramba — energija: <span class="energy">${ep}</span></div>
+      <div class="center muted" style="font-size:12px;margin-bottom:4px">${chosenTxt}</div>
+      <div class="hand">${handHtml}</div>
+      <div class="end-poss btn-row" style="margin-top:10px">
+        <button class="btn red" onclick="resolveOppAttack()">${chosen.length?'🛡 Brani se!':'Pusti napad →'}</button>
+      </div>
+      <div class="log">${G.log.join('')||''}</div>
+    </div>
   </div>`;
 }
 function chooseDefense(idx){
