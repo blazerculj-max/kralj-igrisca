@@ -68,6 +68,36 @@
   @keyframes celebrate{0%,100%{transform:translateY(0);}30%{transform:translateY(-16px);}60%{transform:translateY(0);}80%{transform:translateY(-8px);}}
 
   /* žoga */
+  /* koš + mreža */
+  .hoop{position:absolute;top:42px;left:50%;transform:translateX(-50%);width:54px;height:10px;
+    background:var(--orange);border-radius:3px;z-index:3;box-shadow:0 0 8px rgba(232,84,30,.6);}
+  .net{position:absolute;top:9px;left:6px;right:6px;height:22px;
+    background:repeating-linear-gradient(90deg,rgba(255,255,255,.5) 0 2px,transparent 2px 6px),
+    repeating-linear-gradient(180deg,rgba(255,255,255,.4) 0 2px,transparent 2px 7px);
+    clip-path:polygon(0 0,100% 0,82% 100%,18% 100%);transform-origin:top center;}
+  .net.swish{animation:netSwish .6s;}
+  @keyframes netSwish{0%{transform:scaleY(1);}30%{transform:scaleY(1.4) scaleX(.9);}60%{transform:scaleY(.85);}100%{transform:scaleY(1);}}
+
+  /* iskre ob košu */
+  .sparks{position:absolute;top:50px;left:50%;transform:translateX(-50%);z-index:6;pointer-events:none;}
+  .spark{position:absolute;width:6px;height:6px;border-radius:50%;background:var(--gold);opacity:0;}
+  .sparks.burst .spark{animation:sparkFly .6s ease-out forwards;}
+  @keyframes sparkFly{0%{opacity:1;transform:translate(0,0) scale(1);}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(.3);}}
+
+  /* ogenj aura ob vroči roki */
+  .fire-aura{position:absolute;bottom:6px;left:8px;font-size:26px;z-index:4;animation:fireFlick .5s infinite alternate;pointer-events:none;}
+  @keyframes fireFlick{0%{transform:scale(1) translateY(0);opacity:.9;}100%{transform:scale(1.15) translateY(-3px);opacity:1;}}
+
+  /* screen shake */
+  .arena.shake{animation:shake .4s;}
+  @keyframes shake{0%,100%{transform:translateX(0);}20%{transform:translateX(-7px);}40%{transform:translateX(7px);}60%{transform:translateX(-5px);}80%{transform:translateX(5px);}}
+
+  /* combo */
+  .combo-badge{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:7;
+    font-family:'Arial Black';font-size:18px;color:var(--gold);text-shadow:2px 2px 0 #000;opacity:0;}
+  .combo-badge.go{animation:comboPop .9s;}
+  @keyframes comboPop{0%{opacity:0;transform:translateX(-50%) scale(.4);}30%{opacity:1;transform:translateX(-50%) scale(1.2);}100%{opacity:0;transform:translateX(-50%) scale(1) translateY(-14px);}}
+
   .ball{position:absolute;width:24px;height:24px;font-size:24px;line-height:24px;text-align:center;z-index:5;pointer-events:none;opacity:0;}
   .ball.fly-you{animation:flyYou .7s ease-out forwards;}
   @keyframes flyYou{0%{opacity:1;left:50px;bottom:60px;transform:scale(1);}100%{opacity:1;right:60px;left:auto;bottom:120px;transform:scale(.7);}}
@@ -119,9 +149,14 @@
   @keyframes cardPlay{0%{transform:translateY(0) scale(1);opacity:1;}100%{transform:translateY(-80px) scale(.6);opacity:0;}}
   .card-cost{position:absolute;top:-8px;left:-8px;width:25px;height:25px;border-radius:50%;
     background:var(--gold);color:#1a1206;font-family:'Arial Black';font-size:13px;
-    display:flex;align-items:center;justify-content:center;border:2px solid #1a1206;}
-  .card-ic{font-size:25px;text-align:center;margin-top:5px;}
-  .card-nm{font-family:'Arial Black';font-size:11px;text-align:center;margin-top:3px;line-height:1.05;}
+    display:flex;align-items:center;justify-content:center;border:2px solid #1a1206;z-index:3;}
+  .card-x{position:absolute;top:-8px;right:-8px;background:var(--orange);color:#fff;border-radius:50%;
+    width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;border:2px solid #1a1206;z-index:3;}
+  .card-art-wrap{width:100%;height:56px;border-radius:7px;overflow:hidden;background:#0d1119;position:relative;margin-bottom:3px;}
+  .card-art{width:100%;height:100%;object-fit:cover;object-position:center 30%;}
+  .card-art-fb{width:100%;height:100%;align-items:center;justify-content:center;font-size:30px;}
+  .reward-cards .card-art-wrap{height:70px;}
+  .card-nm{font-family:'Arial Black';font-size:11px;text-align:center;margin-top:1px;line-height:1.05;}
   .card-desc{font-size:9px;text-align:center;margin-top:auto;color:#3a4250;line-height:1.12;}
   .card-type{position:absolute;bottom:3px;left:0;right:0;text-align:center;font-size:7.5px;
     text-transform:uppercase;letter-spacing:1px;color:#8a7a5a;}
@@ -154,16 +189,31 @@ function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 let _tt;function toast(m){const t=$('toast');t.innerHTML=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),1500);}
 
+/* enotna vsebina karte (ilustracija zgoraj + info spodaj). fallback na emoji če slika manjka */
+function cardInner(id, count){
+  const c=CARD_DEFS[id];
+  const typeLbl=c.type==='attack'?'napad':c.type==='defense'?'obramba':'strat.';
+  const badge=count>1?`<div class="card-x">×${count}</div>`:'';
+  const img=c.img?`<img class="card-art" src="${c.img}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+    <div class="card-art-fb" style="display:none">${c.ic}</div>`
+    :`<div class="card-art-fb" style="display:flex">${c.ic}</div>`;
+  return `<div class="card-cost">${c.cost}</div>${badge}
+    <div class="card-art-wrap">${img}</div>
+    <div class="card-nm">${c.nm}</div>
+    <div class="card-desc">${c.desc}</div>
+    <div class="card-type">${typeLbl}</div>`;
+}
+
 /* ---------- KARTE ---------- */
 const CARD_DEFS={
-  met:       {nm:'Met',        ic:'🏀', cost:1, type:'attack',  pts:2, base:0.70, desc:'Poskus za 2. ~70%'},
-  met3:      {nm:'Met za 3',   ic:'🎯', cost:1, type:'attack',  pts:3, base:0.45, desc:'Poskus za 3. ~45%'},
-  prodor:    {nm:'Prodor',     ic:'⚡', cost:2, type:'attack',  pts:2, base:0.80, foul:0.30, desc:'2 toč ~80%. 30% faul.'},
-  protinapad:{nm:'Protinapad', ic:'💨', cost:0, type:'attack',  pts:2, base:0.60, requiresFast:true, desc:'Zastonj 2 toč. Po kraji.'},
-  blokada:   {nm:'Blokada',    ic:'🛡', cost:1, type:'defense', reactive:true, blockChance:0.55, desc:'Prepreči met ~55%.'},
-  skok:      {nm:'Skok',       ic:'🔁', cost:1, type:'defense', rebound:true, desc:'Po zgrešenem → žoga + karta.'},
-  kraja:     {nm:'Kraja',      ic:'✋', cost:1, type:'defense', reactive:true, stealChance:0.35, desc:'35% ukradeš → protinapad.'},
-  vrocaroka: {nm:'Vroča roka', ic:'🔥', cost:1, type:'strategy',hotHand:0.20, desc:'Meti +20% to posest.'},
+  met:       {nm:'Met',        ic:'🏀', img:'assets/card_met.png',        cost:1, type:'attack',  pts:2, base:0.70, desc:'Poskus za 2. ~70%'},
+  met3:      {nm:'Met za 3',   ic:'🎯', img:'assets/card_met3.png',       cost:1, type:'attack',  pts:3, base:0.45, desc:'Poskus za 3. ~45%'},
+  prodor:    {nm:'Prodor',     ic:'⚡', img:'assets/card_prodor.png',     cost:2, type:'attack',  pts:2, base:0.80, foul:0.30, desc:'2 toč ~80%. 30% faul.'},
+  protinapad:{nm:'Protinapad', ic:'💨', img:'assets/card_protinapad.png', cost:0, type:'attack',  pts:2, base:0.60, requiresFast:true, desc:'Zastonj 2 toč. Po kraji.'},
+  blokada:   {nm:'Blokada',    ic:'🛡', img:'assets/card_blokada.png',    cost:1, type:'defense', reactive:true, blockChance:0.55, desc:'Prepreči met ~55%.'},
+  skok:      {nm:'Skok',       ic:'🔁', img:'assets/card_skok.png',       cost:1, type:'defense', rebound:true, desc:'Po zgrešenem → žoga + karta.'},
+  kraja:     {nm:'Kraja',      ic:'✋', img:'assets/card_kraja.png',      cost:1, type:'defense', reactive:true, stealChance:0.35, desc:'35% ukradeš → protinapad.'},
+  vrocaroka: {nm:'Vroča roka', ic:'🔥', img:'assets/card_vrocaroka.png',  cost:1, type:'strategy',hotHand:0.20, desc:'Meti +20% to posest.'},
 };
 const STRELEC_DECK=['met','met','met','met','met3','met3','prodor','protinapad','blokada','skok','kraja','vrocaroka'];
 const REWARD_POOL=['met3','prodor','blokada','kraja','vrocaroka','met','skok'];
@@ -222,18 +272,14 @@ function showDeck(){
 }
 function staticCard(id,count){
   const c=CARD_DEFS[id];
-  return `<div class="card ${c.type}"><div class="card-cost">${c.cost}</div>
-    ${count>1?`<div style="position:absolute;top:-8px;right:-8px;background:var(--orange);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:bold;border:2px solid #1a1206">×${count}</div>`:''}
-    <div class="card-ic">${c.ic}</div><div class="card-nm">${c.nm}</div>
-    <div class="card-desc">${c.desc}</div>
-    <div class="card-type">${c.type==='attack'?'napad':c.type==='defense'?'obramba':'strat.'}</div></div>`;
+  return `<div class="card ${c.type}">${cardInner(id,count)}</div>`;
 }
 
 /* ---------- BOJ ---------- */
 function startBattle(oppIdx){
   const opp=OPPONENTS[oppIdx];
   G={opp,oppIdx,youScore:0,oppScore:0,target:21,deck:shuffle([...RUN.deck]),hand:[],discard:[],
-     energy:0,maxEnergy:3,hotHand:0,fastBreak:false,youFauls:0,oppFauls:0,possession:'you',log:[],over:false,_react:[]};
+     energy:0,maxEnergy:3,hotHand:0,fastBreak:false,youFauls:0,oppFauls:0,possession:'you',log:[],over:false,_react:[],combo:0};
   startPossession('you');
 }
 function drawCards(n){
@@ -265,17 +311,12 @@ function renderBattle(){
   let handHtml='';
   if(yourTurn){
     handHtml=G.hand.map((id,idx)=>{const c=CARD_DEFS[id];const ok=canPlay(id);
-      return `<div class="card ${c.type} ${ok?'':'unplayable'}" data-idx="${idx}" onclick="${ok?`playCard(${idx})`:''}">
-        <div class="card-cost">${c.cost}</div><div class="card-ic">${c.ic}</div>
-        <div class="card-nm">${c.nm}</div><div class="card-desc">${c.desc}</div>
-        <div class="card-type">${c.type==='attack'?'napad':c.type==='defense'?'obramba':'strat.'}</div></div>`;
+      return `<div class="card ${c.type} ${ok?'':'unplayable'}" data-idx="${idx}" onclick="${ok?`playCard(${idx})`:''}">${cardInner(id,1)}</div>`;
     }).join('');
   } else {
     const reactCards=G.hand.map((id,idx)=>({id,idx})).filter(x=>CARD_DEFS[x.id].reactive);
     handHtml=reactCards.map(x=>{const c=CARD_DEFS[x.id];const ok=G.energy>=c.cost && !G._react.includes(x.idx);
-      return `<div class="card ${c.type} ${ok?'':'unplayable'}" onclick="${ok?`playDefenseReact(${x.idx})`:''}">
-        <div class="card-cost">${c.cost}</div><div class="card-ic">${c.ic}</div>
-        <div class="card-nm">${c.nm}</div><div class="card-desc">${c.desc}</div></div>`;
+      return `<div class="card ${c.type} ${ok?'':'unplayable'}" onclick="${ok?`playDefenseReact(${x.idx})`:''}">${cardInner(x.id,1)}</div>`;
     }).join('') || '<div class="muted" style="padding:14px;font-size:13px">Ni obrambnih kart v roki.</div>';
   }
 
@@ -283,10 +324,13 @@ function renderBattle(){
     <div class="arena" id="arena">
       <img class="arena-bg" src="assets/arena.png" alt="">
       <div class="arena-fade"></div>
+      <div class="hoop" id="hoop"><div class="net" id="net"></div></div>
       <img class="fighter you" id="f-you" src="assets/hero.png" alt="">
       <img class="fighter opp" id="f-opp" src="${G.opp.img}" alt="">
       <div class="ball" id="ball">🏀</div>
+      <div class="sparks" id="sparks"></div>
       <div class="pts-pop" id="pts-pop"></div>
+      ${G.hotHand>0?'<div class="fire-aura" id="fire-aura">🔥🔥🔥</div>':''}
     </div>
     <div class="scoreboard">
       <div class="score-side you"><div class="nm">🔥 TI</div><div class="pts" id="you-pts">${G.youScore}</div><div class="fauls">${yf}</div></div>
@@ -313,7 +357,13 @@ function animShoot(who){const f=$(who==='you'?'f-you':'f-opp');if(f){f.classList
   const ball=$('ball');if(ball){ball.className='ball';void ball.offsetWidth;ball.classList.add(who==='you'?'fly-you':'fly-opp');}}
 function animScore(who){const f=$(who==='you'?'f-you':'f-opp');if(f){f.classList.add('celebrate');setTimeout(()=>f.classList.remove('celebrate'),600);}
   const other=$(who==='you'?'f-opp':'f-you');if(other){other.classList.add('hurt');setTimeout(()=>other.classList.remove('hurt'),400);}
-  const pe=$(who==='you'?'you-pts':'opp-pts');if(pe){pe.classList.add('bump');setTimeout(()=>pe.classList.remove('bump'),400);}}
+  const pe=$(who==='you'?'you-pts':'opp-pts');if(pe){pe.classList.add('bump');setTimeout(()=>pe.classList.remove('bump'),400);}
+  // mreža zaniha + iskre
+  const net=$('net');if(net){net.classList.add('swish');setTimeout(()=>net.classList.remove('swish'),600);}
+  burstSparks();}
+function burstSparks(){const s=$('sparks');if(!s)return;s.innerHTML='';for(let i=0;i<8;i++){const sp=document.createElement('div');sp.className='spark';const ang=Math.random()*Math.PI*2,dist=20+Math.random()*30;sp.style.setProperty('--dx',(Math.cos(ang)*dist).toFixed(0)+'px');sp.style.setProperty('--dy',(Math.sin(ang)*dist).toFixed(0)+'px');s.appendChild(sp);}void s.offsetWidth;s.classList.add('burst');setTimeout(()=>s.classList.remove('burst'),650);}
+function shakeArena(){const a=$('arena');if(a){a.classList.add('shake');setTimeout(()=>a.classList.remove('shake'),400);}}
+function comboFlash(n){const a=$('arena');if(!a)return;const b=document.createElement('div');b.className='combo-badge';b.textContent=n+'× COMBO!';a.appendChild(b);void b.offsetWidth;b.classList.add('go');setTimeout(()=>b.remove(),900);}
 function ptsPopup(txt,color,side){const p=$('pts-pop');if(!p)return;p.textContent=txt;p.style.color=color;p.style[side]=side==='left'?'30px':'auto';if(side==='right')p.style.right='30px';p.style[side==='left'?'right':'left']='auto';p.className='pts-pop';void p.offsetWidth;p.classList.add('go');}
 
 function playCard(idx){
@@ -338,9 +388,13 @@ function resolveShot(c){
   let p=clamp(c.base+HERO_STATS.atk+G.hotHand-G.opp.def,0.05,0.97);
   animShoot('you');
   setTimeout(()=>{
-    if(chance(p)){G.youScore+=c.pts;logMsg(`${c.ic} ${c.nm}: KOŠ! +${c.pts} (${Math.round(p*100)}%)`,'hit');animScore('you');ptsPopup('+'+c.pts,'#2ecc71','left');}
-    else{logMsg(`${c.ic} ${c.nm}: zgrešil (${Math.round(p*100)}%)`,'miss');}
-    if(c.foul&&chance(c.foul)){G.oppFauls++;logMsg('😤 Faul nasprotnika!','info');}
+    if(chance(p)){
+      G.youScore+=c.pts;G.combo++;
+      logMsg(`${c.ic} ${c.nm}: KOŠ! +${c.pts} (${Math.round(p*100)}%)`,'hit');animScore('you');ptsPopup('+'+c.pts,'#2ecc71','left');
+      if(G.combo>=2) comboFlash(G.combo);
+    }
+    else{logMsg(`${c.ic} ${c.nm}: zgrešil (${Math.round(p*100)}%)`,'miss');G.combo=0;}
+    if(c.foul&&chance(c.foul)){G.oppFauls++;logMsg('😤 Faul nasprotnika!','info');shakeArena();}
     const ye=$('you-pts');if(ye)ye.textContent=G.youScore;
   },450);
 }
@@ -368,8 +422,8 @@ function runOppAttack(rem){
     if(reactIds.includes('blokada')&&chance(CARD_DEFS.blokada.blockChance))blocked=true;
     if(!blocked&&reactIds.includes('kraja')&&chance(CARD_DEFS.kraja.stealChance))stolen=true;
     G._react=[];
-    if(stolen){logMsg('✋ KRAJA! Protinapad!','hit');G.fastBreak=true;animScore('you');setTimeout(()=>startPossession('you'),800);return;}
-    if(blocked){logMsg('🛡 BLOKADA! Ustavil si napad!','hit');animScore('you');runOppAttack(rem-1);return;}
+    if(stolen){logMsg('✋ KRAJA! Protinapad!','hit');G.fastBreak=true;animScore('you');shakeArena();setTimeout(()=>startPossession('you'),800);return;}
+    if(blocked){logMsg('🛡 BLOKADA! Ustavil si napad!','hit');animScore('you');shakeArena();runOppAttack(rem-1);return;}
     let p=clamp(G.opp.atk+(three?-0.15:0.05),0.05,0.95);
     animShoot('opp');
     setTimeout(()=>{
@@ -401,9 +455,7 @@ function winBattle(){
 function showReward(){
   const opts=shuffle([...REWARD_POOL]).slice(0,3);
   const cards=opts.map(id=>{const c=CARD_DEFS[id];
-    return `<div class="card ${c.type}" onclick="takeReward('${id}')"><div class="card-cost">${c.cost}</div>
-      <div class="card-ic">${c.ic}</div><div class="card-nm">${c.nm}</div><div class="card-desc">${c.desc}</div>
-      <div class="card-type">${c.type==='attack'?'napad':c.type==='defense'?'obramba':'strat.'}</div></div>`;}).join('');
+    return `<div class="card ${c.type}" onclick="takeReward('${id}')">${cardInner(id,1)}</div>`;}).join('');
   screen.innerHTML=`<div class="screen center">
     <div style="font-size:46px;margin-top:16px">✅</div><h2 style="color:var(--green);margin:8px 0">Zmaga!</h2>
     <div class="muted" style="margin-bottom:4px">Izberi 1 karto v svoj dek:</div>
