@@ -158,12 +158,12 @@
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.65;}}
 
   /* HAND */
-  .hand{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:8px;min-height:158px;}
-  /* === NOVA KARTA: full-bleed ilustracija === */
-  .card{width:98px;height:146px;border-radius:12px;cursor:pointer;position:relative;transition:transform .15s,box-shadow .15s;
-    overflow:hidden;background:#0d1119;border:2.5px solid #2a3344;
+  .hand{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin-top:8px;min-height:205px;}
+  /* === KARTA: full-bleed ilustracija, večja === */
+  .card{width:130px;height:195px;border-radius:14px;cursor:pointer;position:relative;transition:transform .15s,box-shadow .15s;
+    overflow:hidden;background:#0d1119;border:3px solid #2a3344;
     box-shadow:0 5px 14px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,255,255,.06);}
-  .card:hover{transform:translateY(-12px) scale(1.03);z-index:20;box-shadow:0 14px 26px rgba(0,0,0,.6),0 0 18px rgba(255,209,102,.35);}
+  .card:hover{transform:translateY(-14px) scale(1.04);z-index:20;box-shadow:0 16px 30px rgba(0,0,0,.6),0 0 20px rgba(255,209,102,.35);}
   .card.unplayable{opacity:.5;filter:grayscale(.65);cursor:not-allowed;}
   .card.unplayable:hover{transform:none;box-shadow:0 5px 14px rgba(0,0,0,.55);}
   /* tip = barva spodnjega traku/obrobe */
@@ -173,37 +173,42 @@
 
   /* polna ilustracija */
   .card-art-wrap{position:absolute;inset:0;background:#0d1119;}
-  .card-art{width:100%;height:100%;object-fit:cover;object-position:center 22%;}
-  .card-art-fb{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:46px;
+  .card-art{width:100%;height:100%;object-fit:cover;object-position:center 20%;}
+  .card-art-fb{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:60px;
     background:radial-gradient(circle at 50% 35%,#1e2738,#0a0d14);}
   /* temni preliv na dnu za berljivost besedila */
-  .card-grad{position:absolute;left:0;right:0;bottom:0;height:62%;pointer-events:none;
-    background:linear-gradient(180deg,transparent,rgba(8,10,16,.55) 42%,rgba(8,10,16,.94) 100%);}
-  /* tanek barvni rob tipa na dnu */
-  .card-typebar{position:absolute;left:0;right:0;bottom:0;height:4px;background:var(--ctype,#888);box-shadow:0 0 8px var(--ctype,#888);}
+  .card-grad{position:absolute;left:0;right:0;bottom:0;height:60%;pointer-events:none;
+    background:linear-gradient(180deg,transparent,rgba(8,10,16,.6) 40%,rgba(8,10,16,.96) 100%);}
+  /* barvni rob tipa na dnu */
+  .card-typebar{position:absolute;left:0;right:0;bottom:0;height:5px;background:var(--ctype,#888);box-shadow:0 0 8px var(--ctype,#888);}
 
   /* cena (žeton zgoraj levo) */
-  .card-cost{position:absolute;top:5px;left:5px;width:26px;height:26px;border-radius:50%;
-    background:radial-gradient(circle at 35% 30%,#ffe49a,var(--gold));color:#1a1206;font-family:'Arial Black';font-size:14px;
-    display:flex;align-items:center;justify-content:center;border:2px solid #1a1206;z-index:4;
+  .card-cost{position:absolute;top:6px;left:6px;width:30px;height:30px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#ffe49a,var(--gold));color:#1a1206;font-family:'Arial Black';font-size:16px;
+    display:flex;align-items:center;justify-content:center;border:2.5px solid #1a1206;z-index:4;
     box-shadow:0 2px 5px rgba(0,0,0,.6);}
   /* count / odds badge zgoraj desno */
-  .card-x{position:absolute;top:5px;right:5px;background:var(--orange);color:#fff;border-radius:8px;
-    min-width:22px;height:21px;padding:0 5px;display:flex;align-items:center;justify-content:center;font-size:11px;
-    font-weight:bold;font-family:'Arial Black';border:1.5px solid #1a1206;z-index:4;box-shadow:0 2px 4px rgba(0,0,0,.5);}
-  /* ime karte */
-  .card-nm{position:absolute;left:6px;right:6px;bottom:20px;z-index:3;
-    font-family:'Arial Black';font-size:11.5px;text-align:center;line-height:1.0;color:#fff;
-    text-shadow:0 1px 0 #000,0 0 6px rgba(0,0,0,.9);letter-spacing:.2px;}
-  /* opis */
-  .card-desc{position:absolute;left:5px;right:5px;bottom:7px;z-index:3;
-    font-size:8px;text-align:center;line-height:1.12;color:#cdd5e2;
+  .card-x{position:absolute;top:6px;right:6px;background:var(--orange);color:#fff;border-radius:9px;
+    min-width:26px;height:24px;padding:0 6px;display:flex;align-items:center;justify-content:center;font-size:13px;
+    font-weight:bold;font-family:'Arial Black';border:2px solid #1a1206;z-index:4;box-shadow:0 2px 4px rgba(0,0,0,.5);}
+  /* ime karte — enotno, nad učinkom */
+  .card-nm{position:absolute;left:6px;right:6px;bottom:46px;z-index:3;
+    font-family:'Arial Black';font-size:12px;text-align:center;line-height:1.0;color:#e9edf4;
+    text-shadow:0 1px 0 #000,0 0 6px rgba(0,0,0,.95);letter-spacing:.2px;text-transform:uppercase;}
+  /* VELIK glavni učinek — takoj jasno kaj karta dela */
+  .card-eff{position:absolute;left:4px;right:4px;bottom:23px;z-index:3;
+    font-family:'Arial Black';font-size:18px;text-align:center;line-height:1;color:var(--gold);
+    text-shadow:0 2px 0 #000,0 0 10px rgba(0,0,0,.9);letter-spacing:.3px;}
+  /* drobna razlaga */
+  .card-desc{position:absolute;left:5px;right:5px;bottom:9px;z-index:3;
+    font-size:9.5px;text-align:center;line-height:1.1;color:#aeb8c8;
     text-shadow:0 1px 2px rgba(0,0,0,.95);}
-  .card-type{display:none;} /* zamenjano s typebar */
+  .card-type{display:none;}
 
-  /* oznaka redkosti — dragulj zgoraj desno pod badgem ni potreben; gem na sredini desno */
-  .reward-cards .card-nm{font-size:13px;bottom:24px;} .reward-cards .card-desc{font-size:9px;bottom:8px;}
-  .reward-cards .card-cost{top:18px;} .reward-cards .rar-gem{top:20px;}
+  /* reward karte malo večji teksti */
+  .reward-cards .card-nm{font-size:13px;bottom:54px;} .reward-cards .card-eff{font-size:22px;bottom:27px;}
+  .reward-cards .card-desc{font-size:10.5px;bottom:11px;}
+  .reward-cards .card-cost{top:20px;} .reward-cards .rar-gem{top:22px;}
 
   .end-poss{text-align:center;margin-top:10px;}
   .log{background:var(--panel);border-radius:10px;padding:7px 11px;margin-top:10px;font-size:12px;
@@ -211,9 +216,9 @@
   .log div{margin:2px 0;animation:fade .3s;}
   .log .hit{color:var(--green);} .log .miss{color:var(--red);} .log .info{color:var(--gold);}
 
-  .reward-cards{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin:18px 0;}
-  .reward-cards .card{width:118px;height:176px;}
-  .reward-cards .card:hover{transform:translateY(-12px) scale(1.05);}
+  .reward-cards{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin:18px 0;}
+  .reward-cards .card{width:150px;height:225px;}
+  .reward-cards .card:hover{transform:translateY(-14px) scale(1.05);}
 
   #toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#000;color:#fff;
     padding:11px 20px;border-radius:30px;font-weight:bold;opacity:0;transition:.3s;z-index:100;pointer-events:none;border:1px solid var(--gold);}
@@ -285,6 +290,7 @@ function cardInner(id, count){
     <div class="card-grad"></div>
     <div class="card-cost">${c.cost}</div>${badge}${rarBadge}
     <div class="card-nm">${c.nm}</div>
+    <div class="card-eff">${c.eff||''}</div>
     <div class="card-desc">${c.desc}</div>
     <div class="card-typebar"></div>`;
 }
@@ -293,35 +299,34 @@ function rarAttr(id){const c=CARD_DEFS[id];const rar=c.rarity||'navadna';if(rar=
   const rs=RARITY_STYLE[rar];return `style="border-color:${rs.col};box-shadow:0 5px 14px rgba(0,0,0,.55),0 0 16px ${rs.glow},inset 0 0 0 1px ${rs.glow}"`;}
 
 /* ---------- KARTE ----------
-   mom = koliko MOMENTUMA karta doda ob igri (gradnja).
-   cashes = karta UNOVČI momentum (met): višji momentum → višja verjetnost, nato reset.
-   buildRisk = ob gradnji ima nasprotnik to šanso za prekinitev (steal).
-   rarity = navadna|redka|epska|legendarna (vizualna oznaka + pogostost v nagradah).
-   spec = posebna mehanika (obravnavana v playCard/chooseDefense/resolveOppAttack). */
+   eff = VELIK glavni učinek (1-2 besedi/št.) — takoj jasno kaj karta dela.
+   desc = drobna razlaga pod njim.
+   mom = momentum gradnja. cashes = unovči momentum. buildRisk = tveganje kraje.
+   rarity = navadna|redka|epska|legendarna. spec = posebna mehanika. */
 const CARD_DEFS={
-  met:       {nm:'Met',        ic:'🏀', img:'assets/card_met.png',        cost:1, type:'attack',  pts:2, base:0.50, cashes:true, rarity:'navadna', desc:'Za 2. Momentum dvigne %.'},
-  met3:      {nm:'Met za 3',   ic:'🎯', img:'assets/card_met3.png',       cost:1, type:'attack',  pts:3, base:0.22, cashes:true, rarity:'navadna', desc:'Za 3. Rabi momentum!'},
-  prodor:    {nm:'Prodor',     ic:'⚡', img:'assets/card_prodor.png',     cost:2, type:'attack',  pts:2, base:0.55, cashes:true, mom:18, foul:0.30, rarity:'navadna', desc:'Za 2 + gradi momentum. 30% faul.'},
-  protinapad:{nm:'Protinapad', ic:'💨', img:'assets/card_protinapad.png', cost:0, type:'attack',  pts:2, base:0.62, cashes:true, requiresFast:true, rarity:'navadna', desc:'Zastonj 2. Po kraji/skoku.'},
-  blokada:   {nm:'Blokada',    ic:'🛡', img:'assets/card_blokada.png',    cost:1, type:'defense', reactive:true, blockChance:0.55, rarity:'navadna', desc:'Prepreči met ~55%.'},
-  skok:      {nm:'Skok',       ic:'🔁', img:'assets/card_skok.png',       cost:1, type:'defense', rebound:true, rarity:'navadna', desc:'Po zgrešenem → žoga + karta.'},
-  kraja:     {nm:'Kraja',      ic:'✋', img:'assets/card_kraja.png',      cost:1, type:'defense', reactive:true, stealChance:0.35, rarity:'navadna', desc:'35% ukradeš → protinapad.'},
-  vrocaroka: {nm:'Vroča roka', ic:'🔥', img:'assets/card_vrocaroka.png',  cost:1, type:'strategy',mom:30, rarity:'navadna', desc:'+30 momentuma takoj!'},
-  podaja:    {nm:'Podaja',     ic:'🎯', img:'assets/card_podaja.png',     cost:0, type:'strategy',mom:16, buildRisk:0.18, rarity:'navadna', desc:'Zastonj +16 mom. Tvegaš krajo.'},
+  met:       {nm:'Met',        ic:'🏀', img:'assets/card_met.png',        cost:1, type:'attack',  pts:2, base:0.50, cashes:true, rarity:'navadna', eff:'ZA 2',      desc:'Momentum dvigne %'},
+  met3:      {nm:'Met za 3',   ic:'🎯', img:'assets/card_met3.png',       cost:1, type:'attack',  pts:3, base:0.22, cashes:true, rarity:'navadna', eff:'ZA 3',      desc:'Rabi momentum!'},
+  prodor:    {nm:'Prodor',     ic:'⚡', img:'assets/card_prodor.png',     cost:2, type:'attack',  pts:2, base:0.55, cashes:true, mom:18, foul:0.30, rarity:'navadna', eff:'ZA 2 +MOM', desc:'Gradi +18 · 30% faul'},
+  protinapad:{nm:'Protinapad', ic:'💨', img:'assets/card_protinapad.png', cost:0, type:'attack',  pts:2, base:0.62, cashes:true, requiresFast:true, rarity:'navadna', eff:'ZA 2', desc:'Zastonj · po kraji/skoku'},
+  blokada:   {nm:'Blokada',    ic:'🛡', img:'assets/card_blokada.png',    cost:1, type:'defense', reactive:true, blockChance:0.55, rarity:'navadna', eff:'55% BLOK',  desc:'Prepreči met'},
+  skok:      {nm:'Skok',       ic:'🔁', img:'assets/card_skok.png',       cost:1, type:'defense', rebound:true, rarity:'navadna', eff:'SKOK',      desc:'Zgrešen → žoga + karta'},
+  kraja:     {nm:'Kraja',      ic:'✋', img:'assets/card_kraja.png',      cost:1, type:'defense', reactive:true, stealChance:0.35, rarity:'navadna', eff:'35% KRAJA', desc:'Ukradeš → protinapad'},
+  vrocaroka: {nm:'Vroča roka', ic:'🔥', img:'assets/card_vrocaroka.png',  cost:1, type:'strategy',mom:30, rarity:'navadna', eff:'+30 MOM',   desc:'Takoj!'},
+  podaja:    {nm:'Podaja',     ic:'🎯', img:'assets/card_podaja.png',     cost:0, type:'strategy',mom:16, buildRisk:0.18, rarity:'navadna', eff:'+16 MOM', desc:'Zastonj · tvegaš krajo'},
 
   /* ===== NOVE KARTE ===== */
   // navadne
-  timeout:   {nm:'Timeout',    ic:'🧊', img:'assets/card_timeout.png',    cost:0, type:'strategy', spec:'timeout', rarity:'navadna', desc:'Izberi: +25 svoj ALI −30 njegov momentum.'},
-  pickroll:  {nm:'Pick & Roll',ic:'🤝', img:'assets/card_pickroll.png',   cost:1, type:'strategy', mom:12, spec:'pickroll', rarity:'navadna', desc:'+12 mom. Naslednji met +8 dodatnega.'},
+  timeout:   {nm:'Timeout',    ic:'🧊', img:'assets/card_timeout.png',    cost:0, type:'strategy', spec:'timeout', rarity:'navadna', eff:'±MOM',     desc:'+25 tvoj ali −30 njegov'},
+  pickroll:  {nm:'Pick & Roll',ic:'🤝', img:'assets/card_pickroll.png',   cost:1, type:'strategy', mom:12, spec:'pickroll', rarity:'navadna', eff:'+12 MOM', desc:'Naslednji met +8%'},
   // redke
-  zmrzni:    {nm:'Zmrzni ritem',ic:'❄️',img:'assets/card_zmrzni.png',     cost:1, type:'defense', reactive:true, spec:'freeze', rarity:'redka', desc:'Prepolovi njegov momentum pred metom.'},
-  slepi:     {nm:'Met na slepo',ic:'🎰',img:'assets/card_slepi.png',      cost:1, type:'attack', pts:3, base:0.40, fixedP:true, mom:30, rarity:'redka', desc:'Fiksno 40% za 3 + zmeraj +30 mom.'},
-  drugival:  {nm:'Drugi val',  ic:'🔋', img:'assets/card_drugival.png',   cost:0, type:'strategy', spec:'refresh', rarity:'redka', desc:'Povrni 2⚡. Momentum −10.'},
+  zmrzni:    {nm:'Zmrzni ritem',ic:'❄️',img:'assets/card_zmrzni.png',     cost:1, type:'defense', reactive:true, spec:'freeze', rarity:'redka', eff:'−50% MOM', desc:'Ohladi nasprotnika'},
+  slepi:     {nm:'Met na slepo',ic:'🎰',img:'assets/card_slepi.png',      cost:1, type:'attack', pts:3, base:0.40, fixedP:true, mom:30, rarity:'redka', eff:'40% ZA 3', desc:'Fiksno · vedno +30 mom'},
+  drugival:  {nm:'Drugi val',  ic:'🔋', img:'assets/card_drugival.png',   cost:0, type:'strategy', spec:'refresh', rarity:'redka', eff:'+2 ⚡',    desc:'Momentum −10'},
   // epske
-  kraljeva:  {nm:'Kraljeva poteza',ic:'👑',img:'assets/card_kraljeva.png',cost:2, type:'attack', pts:2, base:0.55, cashes:true, spec:'royal', rarity:'epska', desc:'Za 2. Pri mom ≥70 zihr koš + obdrži mom.'},
-  kradljivec:{nm:'Kradljivec momentuma',ic:'🪞',img:'assets/card_kradljivec.png',cost:1,type:'defense',reactive:true,spec:'steal_mom',rarity:'epska',desc:'Ukradeš njegov momentum sebi.'},
+  kraljeva:  {nm:'Kraljeva poteza',ic:'👑',img:'assets/card_kraljeva.png',cost:2, type:'attack', pts:2, base:0.55, cashes:true, spec:'royal', rarity:'epska', eff:'ZA 2', desc:'Mom ≥70 = zihr koš'},
+  kradljivec:{nm:'Kradljivec',  ic:'🪞',img:'assets/card_kradljivec.png',cost:1,type:'defense',reactive:true,spec:'steal_mom',rarity:'epska', eff:'UKRADI MOM', desc:'Njegov momentum → tebi'},
   // legendarna
-  vognju:    {nm:'V ognju!',   ic:'⚡', img:'assets/card_vognju.png',     cost:3, type:'strategy', spec:'onfire', rarity:'legendarna', desc:'Momentum na 100. Naslednji met je bomba.'},
+  vognju:    {nm:'V ognju!',   ic:'⚡', img:'assets/card_vognju.png',     cost:3, type:'strategy', spec:'onfire', rarity:'legendarna', eff:'MOM = 100', desc:'Naslednji met je bomba'},
 };
 const STRELEC_DECK=['met','met','met','met3','met3','prodor','protinapad','podaja','blokada','skok','kraja','vrocaroka'];
 /* nagrade po redkosti — legendarna NI v rednem poolu (samo boss/poseben drop) */
