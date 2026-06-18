@@ -214,17 +214,37 @@ const CARD_DEFS={
   skok:      {nm:'Skok',       ic:'🔁', img:'assets/card_skok.png',       cost:1, type:'defense', rebound:true, desc:'Po zgrešenem → žoga + karta.'},
   kraja:     {nm:'Kraja',      ic:'✋', img:'assets/card_kraja.png',      cost:1, type:'defense', reactive:true, stealChance:0.35, desc:'35% ukradeš → protinapad.'},
   vrocaroka: {nm:'Vroča roka', ic:'🔥', img:'assets/card_vrocaroka.png',  cost:1, type:'strategy',hotHand:0.20, desc:'Meti +20% to posest.'},
+  podaja:    {nm:'Podaja',     ic:'🎯', img:'assets/card_podaja.png',     cost:0, type:'strategy',assist:0.25, desc:'Zastonj. Naslednji met +25%.'},
 };
-const STRELEC_DECK=['met','met','met','met','met3','met3','prodor','protinapad','blokada','skok','kraja','vrocaroka'];
-const REWARD_POOL=['met3','prodor','blokada','kraja','vrocaroka','met','skok'];
+const STRELEC_DECK=['met','met','met','met3','met3','prodor','protinapad','podaja','blokada','skok','kraja','vrocaroka'];
+const REWARD_POOL=['met3','prodor','blokada','kraja','vrocaroka','met','skok','podaja'];
 
 /* ---------- NASPROTNIKI ---------- */
 const OPPONENTS=[
-  {nm:'Amaterji',      img:'assets/opp1.png', atk:0.50, def:0.05, aggro:0.3, desc:'Lahki. Osnovni meti.'},
-  {nm:'Mestni prvaki', img:'assets/opp2.png', atk:0.62, def:0.14, aggro:0.5, desc:'Srednji. Boljša obramba.'},
-  {nm:'Legende ulice', img:'assets/opp3.png', atk:0.74, def:0.22, aggro:0.7, desc:'BOSS. Kaznujejo napake.', boss:true},
+  {nm:'Amaterji', img:'assets/opp1.png', atk:0.50, def:0.05,
+   pattern:['met','met','met3'], // kaj rad meče
+   trait:'Preprosti. Mečejo večinoma od blizu. Šibka obramba — izkoristi prodore.',
+   reads:0.15, // kako dobro berejo tvoj vzorec (blokirajo ponavljanje)
+   desc:'Lahki · slaba obramba'},
+  {nm:'Mestni prvaki', img:'assets/opp2.png', atk:0.62, def:0.16,
+   pattern:['met','met3','prodor','met'],
+   trait:'Uravnoteženi. Dobro berejo ponavljanje — menjaj poteze!',
+   reads:0.35,
+   desc:'Srednji · berejo vzorec'},
+  {nm:'Legende ulice', img:'assets/opp3.png', atk:0.74, def:0.24,
+   pattern:['met3','prodor','met3','prodor'],
+   trait:'BOSS. Agresivni, mečejo trojke. Kaznujejo vsako napako. Blokiraj pravočasno.',
+   reads:0.5,
+   desc:'BOSS · agresivne trojke', boss:true},
 ];
 const HERO_STATS={atk:0.18, def:-0.05};
+
+/* COMBO definicije: katera karta omogoči/ojača naslednjo */
+const COMBOS={
+  // po Skoku je naslednji napad zastonj protinapad (že v fastBreak)
+  // po Podaji (če dodamo) bi bil naslednji met +bonus
+  // po 2 zaporednih zadetkih = vroča serija (combo števec)
+};
 
 let RUN=null, G=null;
 function newRun(){ RUN={deck:[...STRELEC_DECK], nodeIdx:0, wins:0}; showMap(); }
@@ -278,8 +298,20 @@ function staticCard(id,count){
 /* ---------- BOJ ---------- */
 function startBattle(oppIdx){
   const opp=OPPONENTS[oppIdx];
+  // najprej pokaži značaj nasprotnika
+  screen.innerHTML=`<div class="screen center" style="padding-top:24px">
+    <div class="muted" style="font-size:13px">${opp.boss?'🔥 FINALNI NASPROTNIK':'Naslednji nasprotnik'}</div>
+    <img src="${opp.img}" style="width:170px;height:170px;margin:14px auto;filter:drop-shadow(0 0 20px ${opp.boss?'rgba(255,77,109,.6)':'rgba(77,143,232,.4)'})">
+    <h2 style="color:${opp.boss?'var(--red)':'var(--gold)'};margin-bottom:10px">${opp.nm}</h2>
+    <div class="muted" style="font-size:13px;line-height:1.5;max-width:360px;margin:0 auto 22px;padding:0 16px">${opp.trait}</div>
+    <button class="btn gold" onclick="beginBattle(${oppIdx})">▶ Začni tekmo</button>
+  </div>`;
+}
+function beginBattle(oppIdx){
+  const opp=OPPONENTS[oppIdx];
   G={opp,oppIdx,youScore:0,oppScore:0,target:21,deck:shuffle([...RUN.deck]),hand:[],discard:[],
-     energy:0,maxEnergy:3,hotHand:0,fastBreak:false,youFauls:0,oppFauls:0,possession:'you',log:[],over:false,_react:[],combo:0};
+     energy:0,maxEnergy:3,hotHand:0,fastBreak:false,youFauls:0,oppFauls:0,possession:'you',log:[],over:false,_react:[],
+     combo:0, assist:0, recentShots:[], oppStep:0, pendingAttack:null, oppAttacksLeft:0};
   startPossession('you');
 }
 function drawCards(n){
@@ -291,37 +323,19 @@ function drawCards(n){
 function logMsg(m,c){ G.log.unshift(`<div class="${c||''}">${m}</div>`); if(G.log.length>5)G.log.pop(); }
 
 function startPossession(who){
-  G.possession=who; G.hotHand=0; G.fastBreak=false; G._react=[];
+  G.possession=who; G.hotHand=0; G.fastBreak=(who==='you'&&G.fastBreak); G._react=[]; G.combo=0;
   if(who==='you'){
     G.energy=G.maxEnergy; G.discard.push(...G.hand); G.hand=[]; drawCards(5);
     logMsg('🏀 Tvoja žoga — napadaj!','info'); renderBattle();
   } else {
-    drawCards(2); // za obrambo
-    logMsg('🛡 Nasprotnik napada...','info'); renderBattle();
-    setTimeout(oppPossession,800);
+    G.discard.push(...G.hand); G.hand=[]; drawCards(5); // polna roka za obrambo
+    logMsg(`🛡 ${G.opp.nm} ima žogo — brani se!`,'info');
+    oppPossession();
   }
 }
 
-function renderBattle(){
-  const yf=Array.from({length:6},(_,i)=>`<div class="faul-dot ${i<G.youFauls?'on':''}"></div>`).join('');
-  const of=Array.from({length:6},(_,i)=>`<div class="faul-dot ${i<G.oppFauls?'on':''}"></div>`).join('');
-  const ep=Array.from({length:G.maxEnergy},(_,i)=>`<div class="e-pip ${i>=G.energy?'spent':''}"></div>`).join('');
-  const yourTurn=G.possession==='you';
-
-  let handHtml='';
-  if(yourTurn){
-    handHtml=G.hand.map((id,idx)=>{const c=CARD_DEFS[id];const ok=canPlay(id);
-      return `<div class="card ${c.type} ${ok?'':'unplayable'}" data-idx="${idx}" onclick="${ok?`playCard(${idx})`:''}">${cardInner(id,1)}</div>`;
-    }).join('');
-  } else {
-    const reactCards=G.hand.map((id,idx)=>({id,idx})).filter(x=>CARD_DEFS[x.id].reactive);
-    handHtml=reactCards.map(x=>{const c=CARD_DEFS[x.id];const ok=G.energy>=c.cost && !G._react.includes(x.idx);
-      return `<div class="card ${c.type} ${ok?'':'unplayable'}" onclick="${ok?`playDefenseReact(${x.idx})`:''}">${cardInner(x.id,1)}</div>`;
-    }).join('') || '<div class="muted" style="padding:14px;font-size:13px">Ni obrambnih kart v roki.</div>';
-  }
-
-  screen.innerHTML=`<div class="screen">
-    <div class="arena" id="arena">
+function arenaHtml(){
+  return `<div class="arena" id="arena">
       <img class="arena-bg" src="assets/arena.png" alt="">
       <div class="arena-fade"></div>
       <div class="hoop" id="hoop"><div class="net" id="net"></div></div>
@@ -331,21 +345,29 @@ function renderBattle(){
       <div class="sparks" id="sparks"></div>
       <div class="pts-pop" id="pts-pop"></div>
       ${G.hotHand>0?'<div class="fire-aura" id="fire-aura">🔥🔥🔥</div>':''}
-    </div>
-    <div class="scoreboard">
+    </div>`;
+}
+function scoreboardHtml(){
+  const yf=Array.from({length:6},(_,i)=>`<div class="faul-dot ${i<G.youFauls?'on':''}"></div>`).join('');
+  const of=Array.from({length:6},(_,i)=>`<div class="faul-dot ${i<G.oppFauls?'on':''}"></div>`).join('');
+  const yourTurn=G.possession==='you';
+  return `<div class="scoreboard">
       <div class="score-side you"><div class="nm">🔥 TI</div><div class="pts" id="you-pts">${G.youScore}</div><div class="fauls">${yf}</div></div>
       <div class="score-mid"><div class="to">do</div><div class="t21">21</div><div style="font-size:20px;margin-top:2px">${yourTurn?'🟠':'⚪'}</div></div>
       <div class="score-side opp"><div class="nm">${G.opp.nm}</div><div class="pts" id="opp-pts">${G.oppScore}</div><div class="fauls">${of}</div></div>
-    </div>
-    ${yourTurn?`
-      <div class="poss-bar">Energija: <span class="energy">${ep}</span>${G.hotHand>0?` · <b>🔥 +${Math.round(G.hotHand*100)}%</b>`:''}</div>
-      <div class="hand" id="hand">${handHtml}</div>
-      <div class="end-poss"><button class="btn" onclick="endPossession()">Končaj napad →</button></div>
-    `:`
-      <div class="intent pulse" id="intent">Nasprotnik pripravlja napad...</div>
-      <div class="center muted" style="font-size:12px;margin-bottom:4px">Reagiraj z obrambo (če imaš energijo):</div>
-      <div class="hand" id="hand">${handHtml}</div>
-    `}
+    </div>`;
+}
+function renderBattle(){
+  const ep=Array.from({length:G.maxEnergy},(_,i)=>`<div class="e-pip ${i>=G.energy?'spent':''}"></div>`).join('');
+  const handHtml=G.hand.map((id,idx)=>{const c=CARD_DEFS[id];const ok=canPlay(id);
+      return `<div class="card ${c.type} ${ok?'':'unplayable'}" data-idx="${idx}" onclick="${ok?`playCard(${idx})`:''}">${cardInner(id,1)}</div>`;
+    }).join('');
+  screen.innerHTML=`<div class="screen">
+    ${arenaHtml()}
+    ${scoreboardHtml()}
+    <div class="poss-bar">Energija: <span class="energy">${ep}</span>${G.hotHand>0?` · <b>🔥 +${Math.round(G.hotHand*100)}%</b>`:''}${G.assist>0?` · <b>🎯 +${Math.round(G.assist*100)}%</b>`:''}${G.combo>=2?` · <b>🔥${G.combo}× niz</b>`:''}</div>
+    <div class="hand" id="hand">${handHtml}</div>
+    <div class="end-poss"><button class="btn" onclick="endPossession()">Končaj napad →</button></div>
     <div class="log">${G.log.join('')||'<div class="muted">Boj se začne...</div>'}</div>
   </div>`;
 }
@@ -376,7 +398,8 @@ function playCard(idx){
 
   setTimeout(()=>{
     if(c.type==='strategy'&&c.hotHand){G.hotHand+=c.hotHand;logMsg(`🔥 Vroča roka! Meti +${Math.round(c.hotHand*100)}%`,'info');}
-    else if(c.type==='attack'){resolveShot(c);}
+    else if(c.type==='strategy'&&c.assist){G.assist+=c.assist;logMsg(`🎯 Podaja! Naslednji met +${Math.round(c.assist*100)}%`,'info');}
+    else if(c.type==='attack'){resolveShot(c,id);}
     else if(c.type==='defense'){if(c.rebound){logMsg('🔁 Skok pripravljen.','info');G.fastBreak=true;}else logMsg(`${c.ic} ${c.nm}.`,'');}
     if(c.requiresFast)G.fastBreak=false;
     checkWin();
@@ -384,13 +407,23 @@ function playCard(idx){
   }, cardEl?320:0);
 }
 
-function resolveShot(c){
-  let p=clamp(c.base+HERO_STATS.atk+G.hotHand-G.opp.def,0.05,0.97);
+function resolveShot(c, id){
+  // vzorec-branje: če si zadnji 2× metal isto karto, jo nasprotnik "bere" in zniža uspeh
+  let readPenalty=0;
+  const rs=G.recentShots;
+  if(rs.length>=2 && rs[rs.length-1]===id && rs[rs.length-2]===id){
+    readPenalty=G.opp.reads;
+    logMsg(`👁 ${G.opp.nm} bere tvoj vzorec! (-${Math.round(readPenalty*100)}%)`,'miss');
+  }
+  let p=clamp(c.base+HERO_STATS.atk+G.hotHand+G.assist-G.opp.def-readPenalty,0.05,0.97);
+  const usedAssist=G.assist; G.assist=0; // assist se porabi
+  G.recentShots.push(id); if(G.recentShots.length>4)G.recentShots.shift();
   animShoot('you');
   setTimeout(()=>{
     if(chance(p)){
       G.youScore+=c.pts;G.combo++;
-      logMsg(`${c.ic} ${c.nm}: KOŠ! +${c.pts} (${Math.round(p*100)}%)`,'hit');animScore('you');ptsPopup('+'+c.pts,'#2ecc71','left');
+      logMsg(`${c.ic} ${c.nm}: KOŠ! +${c.pts} (${Math.round(p*100)}%${usedAssist?' +podaja':''})`,'hit');
+      animScore('you');ptsPopup('+'+c.pts,'#2ecc71','left');
       if(G.combo>=2) comboFlash(G.combo);
     }
     else{logMsg(`${c.ic} ${c.nm}: zgrešil (${Math.round(p*100)}%)`,'miss');G.combo=0;}
@@ -399,41 +432,110 @@ function resolveShot(c){
   },450);
 }
 
-function playDefenseReact(idx){
-  const id=G.hand[idx];const c=CARD_DEFS[id];if(G.energy<c.cost||G._react.includes(idx))return;
-  G.energy-=c.cost;G._react.push(idx);
-  logMsg(`${c.ic} ${c.nm} pripravljena!`,'info');renderBattle();
-}
-
 function endPossession(){if(G.over)return;startPossession(G.possession==='you'?'opp':'you');}
 
-/* AI napad */
-function oppPossession(){if(G.over)return;G.energy=G.maxEnergy;G._react=[];renderBattle();
-  let n=G.opp.aggro>0.6?2:(chance(G.opp.aggro)?2:1);runOppAttack(n);}
-function runOppAttack(rem){
+/* ============================================================
+   AI NAPAD — na poteze, čaka NEOMEJENO na igralčevo obrambo
+   Potek: AI pripravi napad iz svojega vzorca → pokaže namero
+   → igralec izbere obrambno karto (ali Pusti) → klikne razreši
+   ============================================================ */
+function oppPossession(){
   if(G.over)return;
-  if(rem<=0){setTimeout(()=>{logMsg('🏀 Žoga gre k tebi.','info');startPossession('you');},800);return;}
-  const three=chance(0.3),pts=three?3:2;
-  const ie=$('intent');if(ie)ie.innerHTML=`Nasprotnik <b>${three?'meri za 3 🎯':'napada koš ⚡'}</b> (${pts})...`;
+  G.energy=G.maxEnergy; G._react=[];
+  // koliko napadov to posest (po vzorcu nasprotnika, 1-2)
+  G.oppAttacksLeft = G.opp.boss?2:(chance(0.5)?2:1);
+  prepareOppAttack();
+}
+function prepareOppAttack(){
+  if(G.over)return;
+  if(G.oppAttacksLeft<=0){ logMsg('🏀 Žoga gre k tebi.','info'); setTimeout(()=>startPossession('you'),700); return; }
+  // izberi potezo iz vzorca nasprotnika
+  const pat=G.opp.pattern;
+  const move=pat[G.oppStep % pat.length]; G.oppStep++;
+  const three=(move==='met3');
+  const drive=(move==='prodor');
+  G.pendingAttack={move, three, drive, pts:three?3:2};
+  G._react=[]; // ponastavi obrambo za ta napad
+  renderOppTurn();
+}
+/* render obrambne poteze (čaka igralca) */
+function renderOppTurn(){
+  const a=G.pendingAttack;
+  const intentTxt = a.three?'meri za 3 🎯 (3 točke)':a.drive?'prodira pod koš ⚡ (2 + nevarnost faula)':'meče za 2 🏀 (2 točki)';
+  const tip = a.three?'Blokada deluje, a trojka je težja zanje.':a.drive?'Prodor težko blokiraš — Kraja je boljša.':'Blokada ali Kraja.';
+  // obrambne karte v roki
+  const reactCards=G.hand.map((id,idx)=>({id,idx})).filter(x=>CARD_DEFS[x.id].reactive);
+  const ep=Array.from({length:G.maxEnergy},(_,i)=>`<div class="e-pip ${i>=G.energy?'spent':''}"></div>`).join('');
+  const chosen=G._react.map(i=>CARD_DEFS[G.hand[i]]).filter(Boolean);
+  const chosenTxt=chosen.length?`Pripravljeno: ${chosen.map(c=>c.ic+' '+c.nm).join(', ')}`:'Nisi izbral obrambe (pustil boš napad).';
+
+  let handHtml=reactCards.map(x=>{const c=CARD_DEFS[x.id];const ok=G.energy>=c.cost && !G._react.includes(x.idx);
+    return `<div class="card ${c.type} ${ok?'':'unplayable'}" onclick="${ok?`chooseDefense(${x.idx})`:''}">${cardInner(x.id,1)}</div>`;
+  }).join('') || '<div class="muted" style="padding:10px;font-size:13px">Ni obrambnih kart v roki — pritisni Pusti.</div>';
+
+  screen.innerHTML=`<div class="screen">
+    ${arenaHtml()}
+    ${scoreboardHtml()}
+    <div class="intent pulse"><b>${G.opp.nm}</b> ${intentTxt}<div style="font-size:11px;color:var(--muted);margin-top:4px">💡 ${tip}</div></div>
+    <div class="poss-bar">Tvoja obramba — energija: <span class="energy">${ep}</span></div>
+    <div class="center muted" style="font-size:12px;margin-bottom:4px">${chosenTxt}</div>
+    <div class="hand">${handHtml}</div>
+    <div class="end-poss btn-row" style="margin-top:10px">
+      <button class="btn red" onclick="resolveOppAttack()">${chosen.length?'🛡 Brani se!':'Pusti napad →'}</button>
+    </div>
+    <div class="log">${G.log.join('')||''}</div>
+  </div>`;
+}
+function chooseDefense(idx){
+  const id=G.hand[idx];const c=CARD_DEFS[id];
+  if(G.energy<c.cost||G._react.includes(idx))return;
+  G.energy-=c.cost;G._react.push(idx);
+  logMsg(`${c.ic} ${c.nm} pripravljena za obrambo!`,'info');
+  renderOppTurn();
+}
+function resolveOppAttack(){
+  if(G.over)return;
+  const a=G.pendingAttack;
+  const reactIds=G._react.map(i=>G.hand[i]).filter(Boolean);
+  // porabi obrambne karte (gredo na discard)
+  G._react.slice().sort((x,y)=>y-x).forEach(i=>{G.discard.push(G.hand[i]);G.hand.splice(i,1);});
+  G._react=[];
+
+  let blocked=false,stolen=false;
+  // prodor je težje blokirati (-20%), lažje krasti
+  const blockMod=a.drive?-0.20:0;
+  const stealMod=a.drive?0.10:0;
+  if(reactIds.includes('blokada')&&chance(clamp(CARD_DEFS.blokada.blockChance+blockMod,0.1,0.9)))blocked=true;
+  if(!blocked&&reactIds.includes('kraja')&&chance(clamp(CARD_DEFS.kraja.stealChance+stealMod,0.1,0.9)))stolen=true;
+
+  if(stolen){
+    logMsg('✋ KRAJA! Ukradel si žogo → protinapad!','hit');animScore('you');shakeArena();
+    G.fastBreak=true; G.pendingAttack=null;
+    setTimeout(()=>startPossession('you'),800); return;
+  }
+  if(blocked){
+    logMsg(`🛡 BLOKADA! Ustavil si ${G.opp.nm}!`,'hit');animScore('you');shakeArena();
+    G.oppAttacksLeft--; G.pendingAttack=null;
+    setTimeout(prepareOppAttack,700); return;
+  }
+  // nasprotnik meče
+  let p=clamp(G.opp.atk+(a.three?-0.15:a.drive?0.08:0.03),0.05,0.95);
+  animShoot('opp');
   setTimeout(()=>{
-    if(G.over)return;
-    let blocked=false,stolen=false;
-    const reactIds=G._react.map(i=>G.hand[i]).filter(Boolean);
-    if(reactIds.includes('blokada')&&chance(CARD_DEFS.blokada.blockChance))blocked=true;
-    if(!blocked&&reactIds.includes('kraja')&&chance(CARD_DEFS.kraja.stealChance))stolen=true;
-    G._react=[];
-    if(stolen){logMsg('✋ KRAJA! Protinapad!','hit');G.fastBreak=true;animScore('you');shakeArena();setTimeout(()=>startPossession('you'),800);return;}
-    if(blocked){logMsg('🛡 BLOKADA! Ustavil si napad!','hit');animScore('you');shakeArena();runOppAttack(rem-1);return;}
-    let p=clamp(G.opp.atk+(three?-0.15:0.05),0.05,0.95);
-    animShoot('opp');
-    setTimeout(()=>{
-      if(chance(p)){G.oppScore+=pts;logMsg(`${G.opp.nm} zadel ${three?'trojko':'koš'}! +${pts}`,'miss');animScore('opp');ptsPopup('+'+pts,'#ff4d6d','right');}
-      else{logMsg(`${G.opp.nm} zgrešil.`,'hit');}
-      const oe=$('opp-pts');if(oe)oe.textContent=G.oppScore;
-      checkWin();
-      if(!G.over)runOppAttack(rem-1);
-    },450);
-  },1300);
+    if(chance(p)){
+      G.oppScore+=a.pts;logMsg(`${G.opp.nm} zadel ${a.three?'trojko':a.drive?'prodor':'met'}! +${a.pts}`,'miss');
+      animScore('opp');ptsPopup('+'+a.pts,'#ff4d6d','right');
+      // prodor lahko izsili TVOJ faul
+      if(a.drive&&chance(0.25)){G.youFauls++;logMsg('😣 Naredil si osebno napako!','miss');
+        if(G.youFauls>=6){logMsg('🚫 6 napak — izključen!','miss');}}
+    } else {
+      logMsg(`${G.opp.nm} zgrešil ${a.three?'trojko':'met'}.`,'hit');
+    }
+    const oe=$('opp-pts');if(oe)oe.textContent=G.oppScore;
+    G.oppAttacksLeft--; G.pendingAttack=null;
+    checkWin();
+    if(!G.over) setTimeout(prepareOppAttack,800);
+  },450);
 }
 
 function checkWin(){if(G.over)return;
