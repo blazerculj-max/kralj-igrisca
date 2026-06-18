@@ -195,6 +195,15 @@
   #toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#000;color:#fff;
     padding:11px 20px;border-radius:30px;font-weight:bold;opacity:0;transition:.3s;z-index:100;pointer-events:none;border:1px solid var(--gold);}
   #toast.show{opacity:1;}
+
+  /* oznaka redkosti — dragulj v zgornjem desnem kotu karte */
+  .rar-gem{position:absolute;top:5px;right:5px;width:11px;height:11px;border-radius:3px;
+    transform:rotate(45deg);border:1.5px solid rgba(0,0,0,.5);z-index:3;
+    box-shadow:0 0 6px currentColor;}
+  .reward-cards .rar-gem{width:14px;height:14px;top:7px;right:7px;}
+  /* legendarni leskeč na reward kartah */
+  @keyframes legGlow{0%,100%{filter:brightness(1);}50%{filter:brightness(1.25);}}
+  .card.leg{animation:legGlow 1.4s infinite;}
 </style>
 </head>
 <body>
@@ -248,30 +257,66 @@ function cardInner(id, count){
   const img=c.img?`<img class="card-art" src="${c.img}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
     <div class="card-art-fb" style="display:none">${c.ic}</div>`
     :`<div class="card-art-fb" style="display:flex">${c.ic}</div>`;
-  return `<div class="card-cost">${c.cost}</div>${badge}
+  const rar=c.rarity||'navadna';
+  const rs=RARITY_STYLE[rar];
+  const rarBadge = rar!=='navadna' ? `<div class="rar-gem" style="background:${rs.col}" title="${rs.lbl}"></div>` : '';
+  return `<div class="card-cost">${c.cost}</div>${badge}${rarBadge}
     <div class="card-art-wrap">${img}</div>
     <div class="card-nm">${c.nm}</div>
     <div class="card-desc">${c.desc}</div>
     <div class="card-type">${typeLbl}</div>`;
 }
+/* doda obrobo redkosti karti — uporabi v razredu/style ob renderju */
+function rarAttr(id){const c=CARD_DEFS[id];const rar=c.rarity||'navadna';if(rar==='navadna')return '';
+  const rs=RARITY_STYLE[rar];return `style="border-color:${rs.col};box-shadow:0 0 12px ${rs.glow},0 4px 10px rgba(0,0,0,.4)"`;}
 
 /* ---------- KARTE ----------
    mom = koliko MOMENTUMA karta doda ob igri (gradnja).
    cashes = karta UNOVČI momentum (met): višji momentum → višja verjetnost, nato reset.
-   buildRisk = ob gradnji ima nasprotnik to šanso za prekinitev (steal). */
+   buildRisk = ob gradnji ima nasprotnik to šanso za prekinitev (steal).
+   rarity = navadna|redka|epska|legendarna (vizualna oznaka + pogostost v nagradah).
+   spec = posebna mehanika (obravnavana v playCard/chooseDefense/resolveOppAttack). */
 const CARD_DEFS={
-  met:       {nm:'Met',        ic:'🏀', img:'assets/card_met.png',        cost:1, type:'attack',  pts:2, base:0.50, cashes:true, desc:'Za 2. Momentum dvigne %.'},
-  met3:      {nm:'Met za 3',   ic:'🎯', img:'assets/card_met3.png',       cost:1, type:'attack',  pts:3, base:0.22, cashes:true, desc:'Za 3. Rabi momentum!'},
-  prodor:    {nm:'Prodor',     ic:'⚡', img:'assets/card_prodor.png',     cost:2, type:'attack',  pts:2, base:0.55, cashes:true, mom:18, foul:0.30, desc:'Za 2 + gradi momentum. 30% faul.'},
-  protinapad:{nm:'Protinapad', ic:'💨', img:'assets/card_protinapad.png', cost:0, type:'attack',  pts:2, base:0.62, cashes:true, requiresFast:true, desc:'Zastonj 2. Po kraji/skoku.'},
-  blokada:   {nm:'Blokada',    ic:'🛡', img:'assets/card_blokada.png',    cost:1, type:'defense', reactive:true, blockChance:0.55, desc:'Prepreči met ~55%.'},
-  skok:      {nm:'Skok',       ic:'🔁', img:'assets/card_skok.png',       cost:1, type:'defense', rebound:true, desc:'Po zgrešenem → žoga + karta.'},
-  kraja:     {nm:'Kraja',      ic:'✋', img:'assets/card_kraja.png',      cost:1, type:'defense', reactive:true, stealChance:0.35, desc:'35% ukradeš → protinapad.'},
-  vrocaroka: {nm:'Vroča roka', ic:'🔥', img:'assets/card_vrocaroka.png',  cost:1, type:'strategy',mom:30, desc:'+30 momentuma takoj!'},
-  podaja:    {nm:'Podaja',     ic:'🎯', img:'assets/card_podaja.png',     cost:0, type:'strategy',mom:16, buildRisk:0.18, desc:'Zastonj +16 mom. Tvegaš krajo.'},
+  met:       {nm:'Met',        ic:'🏀', img:'assets/card_met.png',        cost:1, type:'attack',  pts:2, base:0.50, cashes:true, rarity:'navadna', desc:'Za 2. Momentum dvigne %.'},
+  met3:      {nm:'Met za 3',   ic:'🎯', img:'assets/card_met3.png',       cost:1, type:'attack',  pts:3, base:0.22, cashes:true, rarity:'navadna', desc:'Za 3. Rabi momentum!'},
+  prodor:    {nm:'Prodor',     ic:'⚡', img:'assets/card_prodor.png',     cost:2, type:'attack',  pts:2, base:0.55, cashes:true, mom:18, foul:0.30, rarity:'navadna', desc:'Za 2 + gradi momentum. 30% faul.'},
+  protinapad:{nm:'Protinapad', ic:'💨', img:'assets/card_protinapad.png', cost:0, type:'attack',  pts:2, base:0.62, cashes:true, requiresFast:true, rarity:'navadna', desc:'Zastonj 2. Po kraji/skoku.'},
+  blokada:   {nm:'Blokada',    ic:'🛡', img:'assets/card_blokada.png',    cost:1, type:'defense', reactive:true, blockChance:0.55, rarity:'navadna', desc:'Prepreči met ~55%.'},
+  skok:      {nm:'Skok',       ic:'🔁', img:'assets/card_skok.png',       cost:1, type:'defense', rebound:true, rarity:'navadna', desc:'Po zgrešenem → žoga + karta.'},
+  kraja:     {nm:'Kraja',      ic:'✋', img:'assets/card_kraja.png',      cost:1, type:'defense', reactive:true, stealChance:0.35, rarity:'navadna', desc:'35% ukradeš → protinapad.'},
+  vrocaroka: {nm:'Vroča roka', ic:'🔥', img:'assets/card_vrocaroka.png',  cost:1, type:'strategy',mom:30, rarity:'navadna', desc:'+30 momentuma takoj!'},
+  podaja:    {nm:'Podaja',     ic:'🎯', img:'assets/card_podaja.png',     cost:0, type:'strategy',mom:16, buildRisk:0.18, rarity:'navadna', desc:'Zastonj +16 mom. Tvegaš krajo.'},
+
+  /* ===== NOVE KARTE ===== */
+  // navadne
+  timeout:   {nm:'Timeout',    ic:'🧊', img:'assets/card_timeout.png',    cost:0, type:'strategy', spec:'timeout', rarity:'navadna', desc:'Izberi: +25 svoj ALI −30 njegov momentum.'},
+  pickroll:  {nm:'Pick & Roll',ic:'🤝', img:'assets/card_pickroll.png',   cost:1, type:'strategy', mom:12, spec:'pickroll', rarity:'navadna', desc:'+12 mom. Naslednji met +8 dodatnega.'},
+  // redke
+  zmrzni:    {nm:'Zmrzni ritem',ic:'❄️',img:'assets/card_zmrzni.png',     cost:1, type:'defense', reactive:true, spec:'freeze', rarity:'redka', desc:'Prepolovi njegov momentum pred metom.'},
+  slepi:     {nm:'Met na slepo',ic:'🎰',img:'assets/card_slepi.png',      cost:1, type:'attack', pts:3, base:0.40, fixedP:true, mom:30, rarity:'redka', desc:'Fiksno 40% za 3 + zmeraj +30 mom.'},
+  drugival:  {nm:'Drugi val',  ic:'🔋', img:'assets/card_drugival.png',   cost:0, type:'strategy', spec:'refresh', rarity:'redka', desc:'Povrni 2⚡. Momentum −10.'},
+  // epske
+  kraljeva:  {nm:'Kraljeva poteza',ic:'👑',img:'assets/card_kraljeva.png',cost:2, type:'attack', pts:2, base:0.55, cashes:true, spec:'royal', rarity:'epska', desc:'Za 2. Pri mom ≥70 zihr koš + obdrži mom.'},
+  kradljivec:{nm:'Kradljivec momentuma',ic:'🪞',img:'assets/card_kradljivec.png',cost:1,type:'defense',reactive:true,spec:'steal_mom',rarity:'epska',desc:'Ukradeš njegov momentum sebi.'},
+  // legendarna
+  vognju:    {nm:'V ognju!',   ic:'⚡', img:'assets/card_vognju.png',     cost:3, type:'strategy', spec:'onfire', rarity:'legendarna', desc:'Momentum na 100. Naslednji met je bomba.'},
 };
 const STRELEC_DECK=['met','met','met','met3','met3','prodor','protinapad','podaja','blokada','skok','kraja','vrocaroka'];
-const REWARD_POOL=['met3','prodor','blokada','kraja','vrocaroka','met','skok','podaja'];
+/* nagrade po redkosti — legendarna NI v rednem poolu (samo boss/poseben drop) */
+const REWARD_BY_RARITY={
+  navadna: ['met3','prodor','blokada','kraja','vrocaroka','met','skok','podaja','timeout','pickroll'],
+  redka:   ['zmrzni','slepi','drugival'],
+  epska:   ['kraljeva','kradljivec'],
+};
+/* verjetnost redkosti za vsak nagradni slot */
+const RARITY_WEIGHTS=[['navadna',0.62],['redka',0.28],['epska',0.10]];
+function rollRarity(){const r=Math.random();let acc=0;for(const[rar,w]of RARITY_WEIGHTS){acc+=w;if(r<acc)return rar;}return 'navadna';}
+const RARITY_STYLE={
+  navadna:   {col:'#b89a78', glow:'rgba(184,154,120,.3)', lbl:'NAVADNA'},
+  redka:     {col:'#4d8fe8', glow:'rgba(77,143,232,.5)',  lbl:'REDKA'},
+  epska:     {col:'#8b5cf6', glow:'rgba(139,92,246,.6)',  lbl:'EPSKA'},
+  legendarna:{col:'#ffd166', glow:'rgba(255,209,102,.7)', lbl:'LEGENDARNA'},
+};
 
 /* ---------- NASPROTNIKI ---------- */
 const OPPONENTS=[
@@ -347,7 +392,7 @@ function showDeck(){
 }
 function staticCard(id,count){
   const c=CARD_DEFS[id];
-  return `<div class="card ${c.type}">${cardInner(id,count)}</div>`;
+  return `<div class="card ${c.type}" ${rarAttr(id)}>${cardInner(id,count)}</div>`;
 }
 
 /* ---------- BOJ ---------- */
@@ -367,7 +412,7 @@ function beginBattle(oppIdx){
   G={opp,oppIdx,youScore:0,oppScore:0,target:21,deck:shuffle([...RUN.deck]),hand:[],discard:[],
      energy:0,maxEnergy:3,hotHand:0,fastBreak:false,youFauls:0,oppFauls:0,possession:'you',log:[],over:false,_react:[],
      combo:0, assist:0, recentShots:[], oppStep:0, pendingAttack:null, oppAttacksLeft:0,
-     momentum:0, oppMom:0};
+     momentum:0, oppMom:0, nextShotBonus:0, onFireBomb:false};
   startPossession('you');
 }
 function drawCards(n){
@@ -380,6 +425,7 @@ function logMsg(m,c){ G.log.unshift(`<div class="${c||''}">${m}</div>`); if(G.lo
 
 function startPossession(who){
   G.possession=who; G.hotHand=0; G.fastBreak=(who==='you'&&G.fastBreak); G._react=[]; G.combo=0;
+  G.nextShotBonus=0; G.onFireBomb=false;
   // momentum se DELNO ohrani med posestmi (×0.6) → topla/hladna serija skozi tekmo
   G.momentum=Math.round(G.momentum*0.6);
   G.oppMom  =Math.round(G.oppMom*0.6);
@@ -421,8 +467,8 @@ function renderBattle(){
   const handHtml=G.hand.map((id,idx)=>{const c=CARD_DEFS[id];const ok=canPlay(id);
       // pri met kartah pokaži živo verjetnost glede na trenutni momentum
       let oddsBadge='';
-      if(c.cashes){const pp=Math.round(shotProb(c)*100);oddsBadge=`<div class="card-x" style="background:${pp>=65?'var(--green)':pp>=40?'var(--gold)':'var(--red)'};color:#1a1206">${pp}%</div>`;}
-      return `<div class="card ${c.type} ${ok?'':'unplayable'}" data-idx="${idx}" onclick="${ok?`playCard(${idx})`:''}">${cardInner(id,1)}${oddsBadge}</div>`;
+      if(c.cashes||c.fixedP){const pp=Math.round(shotProb(c)*100);oddsBadge=`<div class="card-x" style="background:${pp>=65?'var(--green)':pp>=40?'var(--gold)':'var(--red)'};color:#1a1206">${pp}%</div>`;}
+      return `<div class="card ${c.type} ${ok?'':'unplayable'}" data-idx="${idx}" ${rarAttr(id)} onclick="${ok?`playCard(${idx})`:''}">${cardInner(id,1)}${oddsBadge}</div>`;
     }).join('');
   screen.innerHTML=`<div class="screen">
     ${arenaHtml()}
@@ -437,10 +483,14 @@ function renderBattle(){
 
 /* živa verjetnost meta (z momentumom) — uporabljeno za prikaz % in resolveShot */
 function shotProb(c){
+  const shotBonus=(G.nextShotBonus||0);
+  if(c.fixedP) return clamp(c.base+shotBonus,0.05,0.97);
   let readPenalty=0;
   const rs=G.recentShots, id=Object.keys(CARD_DEFS).find(k=>CARD_DEFS[k]===c);
   if(rs.length>=2 && rs[rs.length-1]===id && rs[rs.length-2]===id) readPenalty=G.opp.reads;
-  return clamp(c.base+HERO_STATS.atk+momBonus(G.momentum)-G.opp.def-readPenalty,0.05,0.97);
+  let p=clamp(c.base+HERO_STATS.atk+momBonus(G.momentum)+shotBonus-G.opp.def-readPenalty,0.05,0.97);
+  if(c.spec==='royal' && G.momentum>=70) p=1;
+  return p;
 }
 
 function canPlay(id){const c=CARD_DEFS[id];if(G.energy<c.cost)return false;if(c.requiresFast&&!G.fastBreak)return false;return true;}
@@ -461,7 +511,10 @@ function ptsPopup(txt,color,side){const p=$('pts-pop');if(!p)return;p.textConten
 
 function playCard(idx){
   const id=G.hand[idx];if(!id||!canPlay(id))return;
-  const c=CARD_DEFS[id];G.energy-=c.cost;
+  const c=CARD_DEFS[id];
+  // Timeout zahteva izbiro PRED igranjem — pokaži mini meni
+  if(c.spec==='timeout'){ promptTimeout(idx); return; }
+  G.energy-=c.cost;
   // animacija karte
   const cardEl=document.querySelector(`#hand .card[data-idx="${idx}"]`);
   if(cardEl)cardEl.classList.add('played');
@@ -469,9 +522,22 @@ function playCard(idx){
 
   setTimeout(()=>{
     if(c.type==='strategy'){
-      // gradnja momentuma
-      addMom('you', c.mom||0);
-      logMsg(`${c.ic} ${c.nm}! +${c.mom} momentuma`,'info');
+      // posebne strateške karte
+      if(c.spec==='refresh'){ // Drugi val
+        G.energy=clamp(G.energy+2,0,99); addMom('you',-10);
+        logMsg('🔋 Drugi val! +2⚡, momentum −10.','info');
+      } else if(c.spec==='onfire'){ // V ognju! (legendarna)
+        G.momentum=100; G.onFireBomb=true;
+        logMsg('⚡ V OGNJU! Momentum 100 — naslednji met je bomba!','info');
+        shakeArena();
+      } else if(c.spec==='pickroll'){ // Pick & Roll
+        addMom('you', c.mom||0); G.nextShotBonus=(G.nextShotBonus||0)+0.08;
+        logMsg(`🤝 Pick & Roll! +${c.mom} mom, naslednji met +8%.`,'info');
+      } else {
+        // navadna gradnja momentuma
+        addMom('you', c.mom||0);
+        logMsg(`${c.ic} ${c.nm}! +${c.mom} momentuma`,'info');
+      }
       // podaja tvega krajo (pohlep kaznuje)
       if(c.buildRisk && chance(c.buildRisk)){
         logMsg(`✋ ${G.opp.nm} prestreže podajo! Žoga izgubljena.`,'miss'); shakeArena();
@@ -488,6 +554,31 @@ function playCard(idx){
   }, cardEl?320:0);
 }
 
+/* Timeout: izbira med +svoj / −njegov momentum */
+function promptTimeout(idx){
+  const oppHas=G.oppMom>0;
+  screen.innerHTML=`<div class="screen">
+    ${arenaHtml()}
+    ${scoreboardHtml()}
+    ${momHtml('you')}
+    <div class="intent"><b>🧊 TIMEOUT</b><div style="font-size:12px;color:var(--muted);margin-top:6px">Izberi učinek:</div></div>
+    <div class="btn-row" style="margin-top:6px">
+      <button class="btn gold" onclick="resolveTimeout(${idx},'self')">📈 +25 svojega momentuma</button>
+      <button class="btn red" onclick="resolveTimeout(${idx},'opp')" ${oppHas?'':'disabled'}>📉 −30 njegovega ${oppHas?'':'(nima)'}</button>
+    </div>
+    <div class="center" style="margin-top:10px"><button class="btn" style="font-size:12px;padding:7px 12px" onclick="renderBattle()">↩ Prekliči</button></div>
+    <div class="log">${G.log.join('')||''}</div>
+  </div>`;
+}
+function resolveTimeout(idx,mode){
+  const id=G.hand[idx]; if(!id)return; const c=CARD_DEFS[id];
+  G.energy-=c.cost; G.hand.splice(idx,1); G.discard.push(id);
+  if(mode==='self'){ addMom('you',25); logMsg('🧊 Timeout: +25 tvojega momentuma.','info'); }
+  else { addMom('opp',-30); logMsg(`🧊 Timeout: ohladil si ${G.opp.nm} (−30 momentuma)!`,'info'); }
+  checkWin();
+  if(!G.over){ if(G.energy<=0){renderBattle();setTimeout(endPossession,800);} else renderBattle(); }
+}
+
 function resolveShot(c, id){
   // vzorec-branje: če si zadnji 2× metal isto karto, jo nasprotnik "bere" in zniža uspeh
   let readPenalty=0;
@@ -497,24 +588,34 @@ function resolveShot(c, id){
     logMsg(`👁 ${G.opp.nm} bere tvoj vzorec! (-${Math.round(readPenalty*100)}%)`,'miss');
   }
   const momAtShot=G.momentum;
-  let p=clamp(c.base+HERO_STATS.atk+momBonus(momAtShot)-G.opp.def-readPenalty,0.05,0.97);
-  // prodor poleg meta še GRADI momentum (hibridna karta)
+  const shotBonus=(G.nextShotBonus||0); G.nextShotBonus=0; // Pick&Roll bonus se porabi
+  // Met na slepo (fixedP): fiksna verjetnost, ne glede na momentum/obrambo
+  let p;
+  if(c.fixedP){ p=clamp(c.base+shotBonus,0.05,0.97); }
+  else        { p=clamp(c.base+HERO_STATS.atk+momBonus(momAtShot)+shotBonus-G.opp.def-readPenalty,0.05,0.97); }
+  // Kraljeva poteza (royal): pri momentumu ≥70 je zagotovljen koš
+  let royalGuaranteed=false;
+  if(c.spec==='royal' && momAtShot>=70){ p=1; royalGuaranteed=true; }
+  // V ognju! bomba — naslednji met po legendarni karti je skoraj zihr
+  let bomb=false;
+  if(G.onFireBomb){ p=clamp(p+0.40,0.05,0.99); bomb=true; G.onFireBomb=false; }
+  // prodor / slepi gradijo momentum tudi ob metu
   if(c.mom) addMom('you', c.mom);
   G.recentShots.push(id); if(G.recentShots.length>4)G.recentShots.shift();
   animShoot('you');
   setTimeout(()=>{
     if(chance(p)){
       G.youScore+=c.pts;G.combo++;
-      const momTxt = momAtShot>=25?` · 🔥${Math.round(momBonus(momAtShot)*100)}% od momentuma`:'';
-      logMsg(`${c.ic} ${c.nm}: KOŠ! +${c.pts} (${Math.round(p*100)}%${momTxt})`,'hit');
+      const tag = royalGuaranteed?' 👑 ZAGOTOVLJENO':bomb?' ⚡ BOMBA':(momAtShot>=25?` · 🔥${Math.round(momBonus(momAtShot)*100)}% od momentuma`:'');
+      logMsg(`${c.ic} ${c.nm}: KOŠ! +${c.pts} (${Math.round(p*100)}%${tag})`,'hit');
       animScore('you');ptsPopup('+'+c.pts,'#2ecc71','left');
       if(G.combo>=2) comboFlash(G.combo);
-      // KOŠ ob visokem momentumu = ohrani več momentuma (vroča serija se nadaljuje)
-      G.momentum = momAtShot>=55 ? Math.round(momAtShot*0.7) : Math.round(momAtShot*0.4);
+      // Kraljeva poteza ob zagotovljenem košu OBDRŽI momentum
+      if(royalGuaranteed){ /* momentum ostane */ }
+      else G.momentum = momAtShot>=55 ? Math.round(momAtShot*0.7) : Math.round(momAtShot*0.4);
     }
     else{
       logMsg(`${c.ic} ${c.nm}: zgrešil (${Math.round(p*100)}%)`,'miss');G.combo=0;
-      // zgrešen met ob visokem momentumu = velik padec (zapraviš priložnost)
       G.momentum=Math.round(momAtShot*0.25);
     }
     if(c.foul&&chance(c.foul)){G.oppFauls++;logMsg('😤 Faul nasprotnika!','info');shakeArena();}
@@ -562,7 +663,7 @@ function renderOppTurn(){
   const chosenTxt=chosen.length?`Pripravljeno: ${chosen.map(c=>c.ic+' '+c.nm).join(', ')}`:'Nisi izbral obrambe (pustil boš napad).';
 
   let handHtml=reactCards.map(x=>{const c=CARD_DEFS[x.id];const ok=G.energy>=c.cost && !G._react.includes(x.idx);
-    return `<div class="card ${c.type} ${ok?'':'unplayable'}" onclick="${ok?`chooseDefense(${x.idx})`:''}">${cardInner(x.id,1)}</div>`;
+    return `<div class="card ${c.type} ${ok?'':'unplayable'}" ${rarAttr(x.id)} onclick="${ok?`chooseDefense(${x.idx})`:''}">${cardInner(x.id,1)}</div>`;
   }).join('') || '<div class="muted" style="padding:10px;font-size:13px">Ni obrambnih kart v roki — pritisni Pusti.</div>';
 
   screen.innerHTML=`<div class="screen">
@@ -600,6 +701,18 @@ function resolveOppAttack(){
   const stealMod=a.drive?0.10:0;
   if(reactIds.includes('blokada')&&chance(clamp(CARD_DEFS.blokada.blockChance+blockMod,0.1,0.9)))blocked=true;
   if(!blocked&&reactIds.includes('kraja')&&chance(clamp(CARD_DEFS.kraja.stealChance+stealMod,0.1,0.9)))stolen=true;
+
+  // POSEBNE obrambne karte na momentum (delujejo pred metom)
+  if(reactIds.includes('kradljivec')){ // ukradi njegov momentum sebi
+    const grab=G.oppMom; addMom('you',grab); G.oppMom=0;
+    logMsg(`🪞 Kradljivec! Ukradel si ${grab} momentuma!`,'hit'); shakeArena();
+    a.momAtShot=0;
+  }
+  if(reactIds.includes('zmrzni')){ // prepolovi njegov momentum
+    const before=G.oppMom; G.oppMom=Math.round(G.oppMom*0.5);
+    logMsg(`❄️ Zmrzni ritem! ${G.opp.nm} ohlajen (${before}→${G.oppMom}).`,'hit');
+    a.momAtShot=G.oppMom;
+  }
 
   if(stolen){
     logMsg('✋ KRAJA! Ukradel si žogo → protinapad!','hit');animScore('you');shakeArena();
@@ -651,13 +764,30 @@ function winBattle(){
   showReward();
 }
 function showReward(){
-  const opts=shuffle([...REWARD_POOL]).slice(0,3);
-  const cards=opts.map(id=>{const c=CARD_DEFS[id];
-    return `<div class="card ${c.type}" onclick="takeReward('${id}')">${cardInner(id,1)}</div>`;}).join('');
+  // 3 sloti, vsak svoja redkost po utežeh; boss zmaga doda možnost legendarne
+  const picks=[]; const used=new Set();
+  const bossBeaten = G.opp && G.opp.boss;
+  for(let i=0;i<3;i++){
+    let rar=rollRarity();
+    // prvi slot po porazu bossa lahko postane legendaren (40%)
+    if(i===0 && bossBeaten && chance(0.4)) rar='legendarna';
+    const pool = rar==='legendarna' ? ['vognju'] : REWARD_BY_RARITY[rar];
+    const avail=pool.filter(id=>!used.has(id));
+    let id = avail.length?avail[Math.floor(Math.random()*avail.length)]
+                         :REWARD_BY_RARITY.navadna.filter(x=>!used.has(x))[0];
+    if(!id) id='met';
+    used.add(id); picks.push(id);
+  }
+  const cards=picks.map(id=>{const c=CARD_DEFS[id];const rar=c.rarity||'navadna';const rs=RARITY_STYLE[rar];
+    const leg=rar==='legendarna'?'leg':'';
+    return `<div class="card ${c.type} ${leg}" ${rarAttr(id)} onclick="takeReward('${id}')">
+      ${cardInner(id,1)}
+      <div style="position:absolute;bottom:-18px;left:0;right:0;text-align:center;font-size:9px;font-weight:bold;letter-spacing:1px;color:${rs.col}">${rs.lbl}</div>
+    </div>`;}).join('');
   screen.innerHTML=`<div class="screen center">
     <div style="font-size:46px;margin-top:16px">✅</div><h2 style="color:var(--green);margin:8px 0">Zmaga!</h2>
     <div class="muted" style="margin-bottom:4px">Izberi 1 karto v svoj dek:</div>
-    <div class="reward-cards">${cards}</div>
+    <div class="reward-cards" style="margin-bottom:28px">${cards}</div>
     <button class="btn" onclick="skipReward()">Preskoči</button></div>`;
 }
 function takeReward(id){RUN.deck.push(id);toast(`➕ ${CARD_DEFS[id].nm} dodana!`);setTimeout(showMap,500);}
