@@ -126,6 +126,27 @@
 
   .poss-bar{text-align:center;padding:7px;background:var(--panel);border-radius:10px;margin-bottom:10px;font-size:13px;}
   .poss-bar b{color:var(--gold);}
+
+  /* MOMENTUM METER */
+  .mom-wrap{background:var(--panel);border-radius:12px;padding:9px 12px;margin-bottom:10px;border:1px solid var(--line);}
+  .mom-top{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:bold;letter-spacing:.5px;}
+  .mom-top .mom-val{font-family:'Arial Black';font-size:15px;}
+  .mom-stage{font-family:'Arial Black';font-size:12px;letter-spacing:.5px;}
+  .mom-track{position:relative;height:18px;border-radius:9px;background:rgba(255,255,255,.08);overflow:hidden;}
+  .mom-fill{position:absolute;inset:0;width:0;border-radius:9px;transition:width .55s cubic-bezier(.34,1.4,.5,1);
+    background:linear-gradient(90deg,var(--blue),var(--gold),var(--orange));}
+  .mom-fill.hot{box-shadow:0 0 14px rgba(232,84,30,.8);animation:momPulse 1s infinite alternate;}
+  @keyframes momPulse{0%{filter:brightness(1);}100%{filter:brightness(1.3);}}
+  .mom-ticks{position:absolute;inset:0;pointer-events:none;}
+  .mom-tick{position:absolute;top:0;bottom:0;width:2px;background:rgba(10,13,20,.45);}
+  .mom-gain{animation:momFlash .5s;}
+  @keyframes momFlash{0%{transform:scale(1);}40%{transform:scale(1.03);}100%{transform:scale(1);}}
+  /* opponent momentum (manjši, rdeč) */
+  .mom-wrap.opp .mom-fill{background:linear-gradient(90deg,#6b1f2e,var(--red),#ff8fa3);}
+  .mom-wrap.opp .mom-fill.hot{box-shadow:0 0 14px rgba(255,77,109,.8);}
+  /* gumb za met — pokaže trenutno verjetnost */
+  .shot-hint{font-size:11px;color:var(--muted);margin-top:3px;}
+  .shot-hint b{color:var(--gold);}
   .energy{display:inline-flex;gap:4px;margin-left:6px;vertical-align:middle;}
   .e-pip{width:15px;height:15px;border-radius:50%;background:var(--gold);box-shadow:0 0 6px rgba(255,209,102,.6);}
   .e-pip.spent{background:rgba(255,255,255,.12);box-shadow:none;}
@@ -187,6 +208,36 @@ const screen=$('screen');
 function chance(p){return Math.random()<p;}
 function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+
+/* ---------- MOMENTUM ---------- */
+const MOM_MAX=100;
+/* met verjetnost = base + atk + bonus(momentum) - def - readPenalty.
+   bonus raste z momentumom: pri 0 mom = 0, pri 100 mom = +0.45 (skoraj zihr met). */
+function momBonus(m){ return (m/MOM_MAX)*0.45; }
+function momStage(m){
+  if(m>=85) return {nm:'V OGNJU',  col:'var(--orange)', ic:'🔥'};
+  if(m>=55) return {nm:'VROČ',     col:'var(--gold)',   ic:'🌡'};
+  if(m>=25) return {nm:'TOPEL',    col:'var(--blue)',   ic:'📈'};
+  return            {nm:'MRZEL',    col:'var(--muted)',  ic:'❄'};
+}
+function addMom(who,amt){
+  if(who==='you'){ G.momentum=clamp(G.momentum+amt,0,MOM_MAX); }
+  else           { G.oppMom =clamp(G.oppMom +amt,0,MOM_MAX); }
+}
+/* meter HTML; side='you'|'opp' */
+function momHtml(side){
+  const m = side==='you'?G.momentum:G.oppMom;
+  const st=momStage(m);
+  const hot = m>=85?'hot':'';
+  const ticks=[25,55,85].map(t=>`<div class="mom-tick" style="left:${t}%"></div>`).join('');
+  const lbl = side==='you'?'TVOJ MOMENTUM':`MOMENTUM · ${G.opp.nm}`;
+  return `<div class="mom-wrap ${side==='opp'?'opp':''}">
+    <div class="mom-top"><span>${lbl}</span>
+      <span class="mom-stage" style="color:${st.col}">${st.ic} ${st.nm} · <span class="mom-val">${Math.round(m)}</span></span></div>
+    <div class="mom-track"><div class="mom-fill ${hot}" id="mom-fill-${side}" style="width:${m}%"></div>
+      <div class="mom-ticks">${ticks}</div></div>
+  </div>`;
+}
 let _tt;function toast(m){const t=$('toast');t.innerHTML=m;t.classList.add('show');clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),1500);}
 
 /* enotna vsebina karte (ilustracija zgoraj + info spodaj). fallback na emoji če slika manjka */
@@ -204,17 +255,20 @@ function cardInner(id, count){
     <div class="card-type">${typeLbl}</div>`;
 }
 
-/* ---------- KARTE ---------- */
+/* ---------- KARTE ----------
+   mom = koliko MOMENTUMA karta doda ob igri (gradnja).
+   cashes = karta UNOVČI momentum (met): višji momentum → višja verjetnost, nato reset.
+   buildRisk = ob gradnji ima nasprotnik to šanso za prekinitev (steal). */
 const CARD_DEFS={
-  met:       {nm:'Met',        ic:'🏀', img:'assets/card_met.png',        cost:1, type:'attack',  pts:2, base:0.70, desc:'Poskus za 2. ~70%'},
-  met3:      {nm:'Met za 3',   ic:'🎯', img:'assets/card_met3.png',       cost:1, type:'attack',  pts:3, base:0.45, desc:'Poskus za 3. ~45%'},
-  prodor:    {nm:'Prodor',     ic:'⚡', img:'assets/card_prodor.png',     cost:2, type:'attack',  pts:2, base:0.80, foul:0.30, desc:'2 toč ~80%. 30% faul.'},
-  protinapad:{nm:'Protinapad', ic:'💨', img:'assets/card_protinapad.png', cost:0, type:'attack',  pts:2, base:0.60, requiresFast:true, desc:'Zastonj 2 toč. Po kraji.'},
+  met:       {nm:'Met',        ic:'🏀', img:'assets/card_met.png',        cost:1, type:'attack',  pts:2, base:0.50, cashes:true, desc:'Za 2. Momentum dvigne %.'},
+  met3:      {nm:'Met za 3',   ic:'🎯', img:'assets/card_met3.png',       cost:1, type:'attack',  pts:3, base:0.22, cashes:true, desc:'Za 3. Rabi momentum!'},
+  prodor:    {nm:'Prodor',     ic:'⚡', img:'assets/card_prodor.png',     cost:2, type:'attack',  pts:2, base:0.55, cashes:true, mom:18, foul:0.30, desc:'Za 2 + gradi momentum. 30% faul.'},
+  protinapad:{nm:'Protinapad', ic:'💨', img:'assets/card_protinapad.png', cost:0, type:'attack',  pts:2, base:0.62, cashes:true, requiresFast:true, desc:'Zastonj 2. Po kraji/skoku.'},
   blokada:   {nm:'Blokada',    ic:'🛡', img:'assets/card_blokada.png',    cost:1, type:'defense', reactive:true, blockChance:0.55, desc:'Prepreči met ~55%.'},
   skok:      {nm:'Skok',       ic:'🔁', img:'assets/card_skok.png',       cost:1, type:'defense', rebound:true, desc:'Po zgrešenem → žoga + karta.'},
   kraja:     {nm:'Kraja',      ic:'✋', img:'assets/card_kraja.png',      cost:1, type:'defense', reactive:true, stealChance:0.35, desc:'35% ukradeš → protinapad.'},
-  vrocaroka: {nm:'Vroča roka', ic:'🔥', img:'assets/card_vrocaroka.png',  cost:1, type:'strategy',hotHand:0.20, desc:'Meti +20% to posest.'},
-  podaja:    {nm:'Podaja',     ic:'🎯', img:'assets/card_podaja.png',     cost:0, type:'strategy',assist:0.25, desc:'Zastonj. Naslednji met +25%.'},
+  vrocaroka: {nm:'Vroča roka', ic:'🔥', img:'assets/card_vrocaroka.png',  cost:1, type:'strategy',mom:30, desc:'+30 momentuma takoj!'},
+  podaja:    {nm:'Podaja',     ic:'🎯', img:'assets/card_podaja.png',     cost:0, type:'strategy',mom:16, buildRisk:0.18, desc:'Zastonj +16 mom. Tvegaš krajo.'},
 };
 const STRELEC_DECK=['met','met','met','met3','met3','prodor','protinapad','podaja','blokada','skok','kraja','vrocaroka'];
 const REWARD_POOL=['met3','prodor','blokada','kraja','vrocaroka','met','skok','podaja'];
@@ -257,6 +311,7 @@ function showTitle(){
     <img class="hero-img" src="assets/hero.png" alt="">
     <div class="center" style="margin:14px 0 24px;color:var(--muted);font-size:14px;line-height:1.6">
       Igraš kot <b style="color:var(--gold)">🔥 STRELEC</b>.<br>
+      <b style="color:var(--orange)">Gradi MOMENTUM</b> z gibanjem, nato ga <b style="color:var(--gold)">unovči z metom</b>.<br>
       Premagaj 3 nasprotnike. Prvi do <b style="color:var(--gold)">21</b> zmaga.
     </div>
     <div class="btn-row"><button class="btn gold" onclick="newRun()">▶ ZAČNI TURNIR</button></div>
@@ -311,7 +366,8 @@ function beginBattle(oppIdx){
   const opp=OPPONENTS[oppIdx];
   G={opp,oppIdx,youScore:0,oppScore:0,target:21,deck:shuffle([...RUN.deck]),hand:[],discard:[],
      energy:0,maxEnergy:3,hotHand:0,fastBreak:false,youFauls:0,oppFauls:0,possession:'you',log:[],over:false,_react:[],
-     combo:0, assist:0, recentShots:[], oppStep:0, pendingAttack:null, oppAttacksLeft:0};
+     combo:0, assist:0, recentShots:[], oppStep:0, pendingAttack:null, oppAttacksLeft:0,
+     momentum:0, oppMom:0};
   startPossession('you');
 }
 function drawCards(n){
@@ -324,9 +380,12 @@ function logMsg(m,c){ G.log.unshift(`<div class="${c||''}">${m}</div>`); if(G.lo
 
 function startPossession(who){
   G.possession=who; G.hotHand=0; G.fastBreak=(who==='you'&&G.fastBreak); G._react=[]; G.combo=0;
+  // momentum se DELNO ohrani med posestmi (×0.6) → topla/hladna serija skozi tekmo
+  G.momentum=Math.round(G.momentum*0.6);
+  G.oppMom  =Math.round(G.oppMom*0.6);
   if(who==='you'){
     G.energy=G.maxEnergy; G.discard.push(...G.hand); G.hand=[]; drawCards(5);
-    logMsg('🏀 Tvoja žoga — napadaj!','info'); renderBattle();
+    logMsg('🏀 Tvoja žoga — gradi momentum, nato unovči!','info'); renderBattle();
   } else {
     G.discard.push(...G.hand); G.hand=[]; drawCards(5); // polna roka za obrambo
     logMsg(`🛡 ${G.opp.nm} ima žogo — brani se!`,'info');
@@ -360,16 +419,28 @@ function scoreboardHtml(){
 function renderBattle(){
   const ep=Array.from({length:G.maxEnergy},(_,i)=>`<div class="e-pip ${i>=G.energy?'spent':''}"></div>`).join('');
   const handHtml=G.hand.map((id,idx)=>{const c=CARD_DEFS[id];const ok=canPlay(id);
-      return `<div class="card ${c.type} ${ok?'':'unplayable'}" data-idx="${idx}" onclick="${ok?`playCard(${idx})`:''}">${cardInner(id,1)}</div>`;
+      // pri met kartah pokaži živo verjetnost glede na trenutni momentum
+      let oddsBadge='';
+      if(c.cashes){const pp=Math.round(shotProb(c)*100);oddsBadge=`<div class="card-x" style="background:${pp>=65?'var(--green)':pp>=40?'var(--gold)':'var(--red)'};color:#1a1206">${pp}%</div>`;}
+      return `<div class="card ${c.type} ${ok?'':'unplayable'}" data-idx="${idx}" onclick="${ok?`playCard(${idx})`:''}">${cardInner(id,1)}${oddsBadge}</div>`;
     }).join('');
   screen.innerHTML=`<div class="screen">
     ${arenaHtml()}
     ${scoreboardHtml()}
-    <div class="poss-bar">Energija: <span class="energy">${ep}</span>${G.hotHand>0?` · <b>🔥 +${Math.round(G.hotHand*100)}%</b>`:''}${G.assist>0?` · <b>🎯 +${Math.round(G.assist*100)}%</b>`:''}${G.combo>=2?` · <b>🔥${G.combo}× niz</b>`:''}</div>
+    ${momHtml('you')}
+    <div class="poss-bar">Energija: <span class="energy">${ep}</span> · <span class="muted" style="font-size:11px">Gradi z 💨⚡🔥🎯 — unovči z 🏀🎯</span></div>
     <div class="hand" id="hand">${handHtml}</div>
     <div class="end-poss"><button class="btn" onclick="endPossession()">Končaj napad →</button></div>
     <div class="log">${G.log.join('')||'<div class="muted">Boj se začne...</div>'}</div>
   </div>`;
+}
+
+/* živa verjetnost meta (z momentumom) — uporabljeno za prikaz % in resolveShot */
+function shotProb(c){
+  let readPenalty=0;
+  const rs=G.recentShots, id=Object.keys(CARD_DEFS).find(k=>CARD_DEFS[k]===c);
+  if(rs.length>=2 && rs[rs.length-1]===id && rs[rs.length-2]===id) readPenalty=G.opp.reads;
+  return clamp(c.base+HERO_STATS.atk+momBonus(G.momentum)-G.opp.def-readPenalty,0.05,0.97);
 }
 
 function canPlay(id){const c=CARD_DEFS[id];if(G.energy<c.cost)return false;if(c.requiresFast&&!G.fastBreak)return false;return true;}
@@ -397,9 +468,19 @@ function playCard(idx){
   G.hand.splice(idx,1);G.discard.push(id);
 
   setTimeout(()=>{
-    if(c.type==='strategy'&&c.hotHand){G.hotHand+=c.hotHand;logMsg(`🔥 Vroča roka! Meti +${Math.round(c.hotHand*100)}%`,'info');}
-    else if(c.type==='strategy'&&c.assist){G.assist+=c.assist;logMsg(`🎯 Podaja! Naslednji met +${Math.round(c.assist*100)}%`,'info');}
-    else if(c.type==='attack'){resolveShot(c,id);}
+    if(c.type==='strategy'){
+      // gradnja momentuma
+      addMom('you', c.mom||0);
+      logMsg(`${c.ic} ${c.nm}! +${c.mom} momentuma`,'info');
+      // podaja tvega krajo (pohlep kaznuje)
+      if(c.buildRisk && chance(c.buildRisk)){
+        logMsg(`✋ ${G.opp.nm} prestreže podajo! Žoga izgubljena.`,'miss'); shakeArena();
+        G.combo=0; checkWin();
+        if(!G.over){ renderBattle(); setTimeout(()=>startPossession('opp'),900); }
+        return;
+      }
+    }
+    else if(c.type==='attack'){ resolveShot(c,id); }
     else if(c.type==='defense'){if(c.rebound){logMsg('🔁 Skok pripravljen.','info');G.fastBreak=true;}else logMsg(`${c.ic} ${c.nm}.`,'');}
     if(c.requiresFast)G.fastBreak=false;
     checkWin();
@@ -415,18 +496,27 @@ function resolveShot(c, id){
     readPenalty=G.opp.reads;
     logMsg(`👁 ${G.opp.nm} bere tvoj vzorec! (-${Math.round(readPenalty*100)}%)`,'miss');
   }
-  let p=clamp(c.base+HERO_STATS.atk+G.hotHand+G.assist-G.opp.def-readPenalty,0.05,0.97);
-  const usedAssist=G.assist; G.assist=0; // assist se porabi
+  const momAtShot=G.momentum;
+  let p=clamp(c.base+HERO_STATS.atk+momBonus(momAtShot)-G.opp.def-readPenalty,0.05,0.97);
+  // prodor poleg meta še GRADI momentum (hibridna karta)
+  if(c.mom) addMom('you', c.mom);
   G.recentShots.push(id); if(G.recentShots.length>4)G.recentShots.shift();
   animShoot('you');
   setTimeout(()=>{
     if(chance(p)){
       G.youScore+=c.pts;G.combo++;
-      logMsg(`${c.ic} ${c.nm}: KOŠ! +${c.pts} (${Math.round(p*100)}%${usedAssist?' +podaja':''})`,'hit');
+      const momTxt = momAtShot>=25?` · 🔥${Math.round(momBonus(momAtShot)*100)}% od momentuma`:'';
+      logMsg(`${c.ic} ${c.nm}: KOŠ! +${c.pts} (${Math.round(p*100)}%${momTxt})`,'hit');
       animScore('you');ptsPopup('+'+c.pts,'#2ecc71','left');
       if(G.combo>=2) comboFlash(G.combo);
+      // KOŠ ob visokem momentumu = ohrani več momentuma (vroča serija se nadaljuje)
+      G.momentum = momAtShot>=55 ? Math.round(momAtShot*0.7) : Math.round(momAtShot*0.4);
     }
-    else{logMsg(`${c.ic} ${c.nm}: zgrešil (${Math.round(p*100)}%)`,'miss');G.combo=0;}
+    else{
+      logMsg(`${c.ic} ${c.nm}: zgrešil (${Math.round(p*100)}%)`,'miss');G.combo=0;
+      // zgrešen met ob visokem momentumu = velik padec (zapraviš priložnost)
+      G.momentum=Math.round(momAtShot*0.25);
+    }
     if(c.foul&&chance(c.foul)){G.oppFauls++;logMsg('😤 Faul nasprotnika!','info');shakeArena();}
     const ye=$('you-pts');if(ye)ye.textContent=G.youScore;
   },450);
@@ -454,7 +544,9 @@ function prepareOppAttack(){
   const move=pat[G.oppStep % pat.length]; G.oppStep++;
   const three=(move==='met3');
   const drive=(move==='prodor');
-  G.pendingAttack={move, three, drive, pts:three?3:2};
+  // nasprotnik gradi momentum z gibanjem (prodor največ); trojka unovči največ momentuma
+  if(drive) addMom('opp',16); else addMom('opp',8);
+  G.pendingAttack={move, three, drive, pts:three?3:2, momAtShot:G.oppMom};
   G._react=[]; // ponastavi obrambo za ta napad
   renderOppTurn();
 }
@@ -476,6 +568,7 @@ function renderOppTurn(){
   screen.innerHTML=`<div class="screen">
     ${arenaHtml()}
     ${scoreboardHtml()}
+    ${momHtml('opp')}
     <div class="intent pulse"><b>${G.opp.nm}</b> ${intentTxt}<div style="font-size:11px;color:var(--muted);margin-top:4px">💡 ${tip}</div></div>
     <div class="poss-bar">Tvoja obramba — energija: <span class="energy">${ep}</span></div>
     <div class="center muted" style="font-size:12px;margin-bottom:4px">${chosenTxt}</div>
@@ -518,18 +611,21 @@ function resolveOppAttack(){
     G.oppAttacksLeft--; G.pendingAttack=null;
     setTimeout(prepareOppAttack,700); return;
   }
-  // nasprotnik meče
-  let p=clamp(G.opp.atk+(a.three?-0.15:a.drive?0.08:0.03),0.05,0.95);
+  // nasprotnik meče — momentum dvigne njegovo verjetnost
+  const momA=(a.momAtShot!=null?a.momAtShot:G.oppMom);
+  let p=clamp(G.opp.atk+momBonus(momA)+(a.three?-0.18:a.drive?0.05:0)-0.02,0.05,0.95);
   animShoot('opp');
   setTimeout(()=>{
     if(chance(p)){
       G.oppScore+=a.pts;logMsg(`${G.opp.nm} zadel ${a.three?'trojko':a.drive?'prodor':'met'}! +${a.pts}`,'miss');
       animScore('opp');ptsPopup('+'+a.pts,'#ff4d6d','right');
+      G.oppMom = momA>=55 ? Math.round(momA*0.7) : Math.round(momA*0.4);
       // prodor lahko izsili TVOJ faul
       if(a.drive&&chance(0.25)){G.youFauls++;logMsg('😣 Naredil si osebno napako!','miss');
         if(G.youFauls>=6){logMsg('🚫 6 napak — izključen!','miss');}}
     } else {
       logMsg(`${G.opp.nm} zgrešil ${a.three?'trojko':'met'}.`,'hit');
+      G.oppMom=Math.round(momA*0.25);
     }
     const oe=$('opp-pts');if(oe)oe.textContent=G.oppScore;
     G.oppAttacksLeft--; G.pendingAttack=null;
