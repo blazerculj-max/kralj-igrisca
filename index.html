@@ -307,11 +307,61 @@
   /* legendarni leskeč na reward kartah */
   @keyframes legGlow{0%,100%{filter:brightness(1);}50%{filter:brightness(1.25);}}
   .card.leg{animation:legGlow 1.4s infinite;}
+
+  /* ============ VIZUALNE NADGRADNJE ============ */
+
+  /* --- SCREEN FLASH (ob košu / ognju) --- */
+  #flash{position:fixed;inset:0;pointer-events:none;z-index:90;opacity:0;}
+  #flash.go{animation:flashGo .45s ease-out;}
+  @keyframes flashGo{0%{opacity:0;}15%{opacity:.55;}100%{opacity:0;}}
+  #flash.gold{background:radial-gradient(circle at 50% 45%,rgba(255,209,102,.9),transparent 65%);}
+  #flash.fire{background:radial-gradient(circle at 50% 50%,rgba(232,84,30,.9),rgba(255,77,0,.4) 40%,transparent 70%);}
+  #flash.blue{background:radial-gradient(circle at 50% 45%,rgba(77,143,232,.8),transparent 65%);}
+
+  /* --- CRT / SCANLINE OVERLAY (retro 16-bit) --- */
+  #crt{position:fixed;inset:0;pointer-events:none;z-index:80;mix-blend-mode:overlay;opacity:.5;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.18) 0px,rgba(0,0,0,.18) 1px,transparent 2px,transparent 3px);}
+  #crt::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,.35) 100%);}
+  body.no-crt #crt{display:none;}
+
+  /* --- boljše ISKRE (več, večje, raznobarvne) --- */
+  @keyframes sparkFly2{0%{opacity:1;transform:translate(0,0) scale(1.3) rotate(0deg);}
+    100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(.2) rotate(var(--rot));}}
+
+  /* --- CARD DRAW (karte se razprejo v roko) --- */
+  @keyframes cardDraw{0%{opacity:0;transform:translateY(60px) scale(.7) rotate(-8deg);}
+    60%{opacity:1;}100%{opacity:1;transform:translateY(0) scale(1) rotate(0deg);}}
+  .card.dealing{animation:cardDraw .4s cubic-bezier(.2,.9,.3,1.2) backwards;}
+
+  /* --- PHASE SWIPE (prehod napad↔obramba) --- */
+  #swipe{position:fixed;inset:0;z-index:95;pointer-events:none;display:flex;align-items:center;justify-content:center;
+    opacity:0;}
+  #swipe.go{animation:swipeGo 1s ease-in-out;}
+  @keyframes swipeGo{0%{opacity:0;transform:scaleX(0);}15%{opacity:1;transform:scaleX(1);}
+    85%{opacity:1;transform:scaleX(1);}100%{opacity:0;transform:scaleX(1.1);}}
+  #swipe .swipe-txt{font-family:'Arial Black';font-size:44px;letter-spacing:3px;text-transform:uppercase;
+    color:#fff;text-shadow:0 4px 0 rgba(0,0,0,.5),0 0 30px currentColor;transform:skewX(-8deg);}
+  #swipe.attack{background:linear-gradient(120deg,rgba(122,46,14,.96),rgba(232,84,30,.96),rgba(255,184,77,.96));}
+  #swipe.defense{background:linear-gradient(120deg,rgba(26,58,107,.96),rgba(77,143,232,.96),rgba(127,179,240,.96));}
+
+  /* --- animiran MOMENTUM ogenj pri visokih vrednostih --- */
+  .mom-fill.hot::after{content:'';position:absolute;inset:0;border-radius:9px;
+    background:repeating-linear-gradient(90deg,transparent,rgba(255,255,255,.35) 8px,transparent 16px);
+    animation:momFlames .6s linear infinite;}
+  @keyframes momFlames{0%{background-position:0 0;}100%{background-position:32px 0;}}
+
+  /* --- gumb za CRT toggle --- */
+  .crt-toggle{position:fixed;bottom:10px;right:10px;z-index:100;font-size:11px;padding:5px 9px;
+    background:rgba(20,25,38,.85);border:1px solid var(--line);border-radius:7px;color:var(--muted);cursor:pointer;}
 </style>
 </head>
 <body>
 <div id="app"><div id="screen"></div></div>
 <div id="toast"></div>
+<div id="flash"></div>
+<div id="swipe"><div class="swipe-txt"></div></div>
+<div id="crt"></div>
+<div class="crt-toggle" onclick="document.body.classList.toggle('no-crt')">📺 CRT</div>
 
 <script>
 "use strict";
@@ -537,6 +587,7 @@ function drawCards(n){
     if(G.deck.length===0){ if(G.discard.length===0)break; G.deck=shuffle(G.discard); G.discard=[]; }
     G.hand.push(G.deck.pop());
   }
+  if(n>=5) G._freshHand=true; // animiraj draw samo ob novi roki
 }
 function logMsg(m,c){ G.log.unshift(`<div class="${c||''}">${m}</div>`); if(G.log.length>5)G.log.pop(); }
 
@@ -549,16 +600,16 @@ function startPossession(who){
   if(who==='you'){
     G.energy=G.maxEnergy; G.discard.push(...G.hand); G.hand=[]; drawCards(5);
     G.shotTaken=false; G.reboundCount=0; G.hasRebound=false;
-    logMsg('🏀 Tvoja žoga — gradi momentum, nato vrži (1 met!).','info'); renderBattle();
+    logMsg('🏀 Tvoja žoga — gradi momentum, nato vrži (1 met!).','info');
+    phaseSwipe('attack', renderBattle);
   } else {
     // OBRAMBA: pripravljene karte iz defPrep gredo v _react, sistem ostane izbran
     G.discard.push(...G.hand); G.hand=[];
-    // pripravljene obrambne karte ostanejo "v roki" kot pripravljene
     G._react=[];
     drawCards(5);
     if(!G.defSystem) G.defSystem='osebna'; // privzeto če nisi izbral
     logMsg(`🛡 ${G.opp.nm} ima žogo — ${DEF_SYSTEMS[G.defSystem].ic} ${DEF_SYSTEMS[G.defSystem].nm} obramba!`,'info');
-    oppPossession();
+    phaseSwipe('defense', oppPossession);
   }
 }
 
@@ -587,12 +638,13 @@ function scoreboardHtml(){
 }
 function renderBattle(){
   const ep=Array.from({length:G.maxEnergy},(_,i)=>`<div class="e-pip ${i>=G.energy?'spent':''}"></div>`).join('');
+  const deal = G._freshHand; G._freshHand=false;
   const handHtml=G.hand.map((id,idx)=>{const c=CARD_DEFS[id];const ok=canPlay(id);
       let oddsBadge='';
       if(c.cashes||c.fixedP){const pp=Math.round(shotProb(c)*100);oddsBadge=`<div class="card-x" style="background:${pp>=65?'var(--green)':pp>=40?'var(--gold)':'var(--red)'};color:#1a1206">${pp}%</div>`;}
-      // obrambne karte v napadu označi kot "pripravi"
       const prepTag = c.type==='defense' ? `<div class="prep-tag">PRIPRAVI ⬇</div>` : '';
-      return `<div class="card ${c.type} ${ok?'':'unplayable'}" data-idx="${idx}" ${rarAttr(id)} onclick="${ok?`playCard(${idx})`:''}">${cardInner(id,1)}${oddsBadge}${prepTag}</div>`;
+      const dealCls = deal?'dealing':''; const dealDelay = deal?`style="animation-delay:${idx*0.06}s"`:'';
+      return `<div class="card ${c.type} ${ok?'':'unplayable'} ${dealCls}" data-idx="${idx}" ${dealDelay} ${rarAttr(id)} onclick="${ok?`playCard(${idx})`:''}">${cardInner(id,1)}${oddsBadge}${prepTag}</div>`;
     }).join('');
 
   // fazni trak
@@ -678,7 +730,16 @@ function animScore(who){const f=$(who==='you'?'f-you':'f-opp');if(f){f.classList
   // mreža zaniha + iskre
   const net=$('net');if(net){net.classList.add('swish');setTimeout(()=>net.classList.remove('swish'),600);}
   burstSparks();}
-function burstSparks(){const s=$('sparks');if(!s)return;s.innerHTML='';for(let i=0;i<8;i++){const sp=document.createElement('div');sp.className='spark';const ang=Math.random()*Math.PI*2,dist=20+Math.random()*30;sp.style.setProperty('--dx',(Math.cos(ang)*dist).toFixed(0)+'px');sp.style.setProperty('--dy',(Math.sin(ang)*dist).toFixed(0)+'px');s.appendChild(sp);}void s.offsetWidth;s.classList.add('burst');setTimeout(()=>s.classList.remove('burst'),650);}
+function burstSparks(){const s=$('sparks');if(!s)return;s.innerHTML='';for(let i=0;i<16;i++){const sp=document.createElement('div');sp.className='spark';const ang=Math.random()*Math.PI*2,dist=28+Math.random()*55;sp.style.setProperty('--dx',(Math.cos(ang)*dist).toFixed(0)+'px');sp.style.setProperty('--dy',(Math.sin(ang)*dist).toFixed(0)+'px');sp.style.setProperty('--rot',(Math.random()*720-360).toFixed(0)+'deg');sp.style.animationName='sparkFly2';const col=['#ffd166','#ffb84d','#e8541e','#fff'][i%4];sp.style.background=col;sp.style.boxShadow='0 0 6px '+col;s.appendChild(sp);}void s.offsetWidth;s.classList.add('burst');setTimeout(()=>s.classList.remove('burst'),700);}
+/* bliskovit flash čez ekran: 'gold'|'fire'|'blue' */
+function screenFlash(kind){const f=$('flash');if(!f)return;f.className='';void f.offsetWidth;f.classList.add(kind||'gold','go');setTimeout(()=>f.className='',500);}
+/* prehod faze: 'attack'|'defense' z napisom */
+function phaseSwipe(kind,cb){const s=$('swipe');if(!s){if(cb)cb();return;}
+  s.querySelector('.swipe-txt').textContent=kind==='attack'?'🔥 NAPAD':'🛡 OBRAMBA';
+  s.querySelector('.swipe-txt').style.color=kind==='attack'?'#ffb84d':'#7fb3f0';
+  s.className='';void s.offsetWidth;s.classList.add(kind,'go');
+  setTimeout(()=>{if(cb)cb();},480);
+  setTimeout(()=>s.className='',1000);}
 function shakeArena(){const a=$('arena');if(a){a.classList.add('shake');setTimeout(()=>a.classList.remove('shake'),400);}}
 function comboFlash(n){const a=$('arena');if(!a)return;const b=document.createElement('div');b.className='combo-badge';b.textContent=n+'× COMBO!';a.appendChild(b);void b.offsetWidth;b.classList.add('go');setTimeout(()=>b.remove(),900);}
 function ptsPopup(txt,color,side){const p=$('pts-pop');if(!p)return;p.textContent=txt;p.style.color=color;p.style[side]=side==='left'?'30px':'auto';if(side==='right')p.style.right='30px';p.style[side==='left'?'right':'left']='auto';p.className='pts-pop';void p.offsetWidth;p.classList.add('go');}
@@ -706,7 +767,7 @@ function playCard(idx){
         logMsg('🔋 Drugi val! +2⚡, momentum −10.','info');
       } else if(c.spec==='onfire'){
         G.momentum=100; G.onFireBomb=true;
-        logMsg('⚡ V OGNJU! Momentum 100 — naslednji met je bomba!','info'); shakeArena();
+        logMsg('⚡ V OGNJU! Momentum 100 — naslednji met je bomba!','info'); shakeArena(); screenFlash('fire');
       } else if(c.spec==='pickroll'){
         addMom('you', c.mom||0); G.nextShotBonus=(G.nextShotBonus||0)+0.08;
         logMsg(`🤝 Pick & Roll! +${c.mom} mom, naslednji met +8%.`,'info');
@@ -797,6 +858,7 @@ function resolveShot(c, id){
       const tag = royalGuaranteed?' 👑 ZAGOTOVLJENO':bomb?' ⚡ BOMBA':(momAtShot>=25?` · 🔥${Math.round(momBonus(momAtShot)*100)}% od momentuma`:'');
       logMsg(`${c.ic} ${c.nm}: KOŠ! +${c.pts} (${Math.round(p*100)}%${tag})`,'hit');
       animScore('you');ptsPopup('+'+c.pts,'#2ecc71','left');
+      burstSparks(); screenFlash(momAtShot>=85?'fire':'gold');
       if(G.combo>=2) comboFlash(G.combo);
       if(royalGuaranteed){ /* momentum ostane */ }
       else G.momentum = momAtShot>=55 ? Math.round(momAtShot*0.7) : Math.round(momAtShot*0.4);
@@ -969,12 +1031,12 @@ function resolveOppAttack(){
   }
 
   if(stolen){
-    logMsg('✋ KRAJA! Ukradel si žogo → protinapad!','hit');animScore('you');shakeArena();
+    logMsg('✋ KRAJA! Ukradel si žogo → protinapad!','hit');animScore('you');shakeArena();screenFlash('blue');
     G.fastBreak=true; G.pendingAttack=null;
     setTimeout(()=>startPossession('you'),800); return;
   }
   if(blocked){
-    logMsg(`🛡 BLOKADA! Ustavil si ${G.opp.nm} — žoga tebi!`,'hit');animScore('you');shakeArena();
+    logMsg(`🛡 BLOKADA! Ustavil si ${G.opp.nm} — žoga tebi!`,'hit');animScore('you');shakeArena();screenFlash('blue');
     G.pendingAttack=null;
     setTimeout(()=>startPossession('you'),900); return;
   }
